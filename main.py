@@ -1,21 +1,54 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 import requests
+import os
 
 app = FastAPI()
 
+WALLET_ADDRESS = "0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a"
+PRICE_USDC = 0.01  # цена за запрос
+
 @app.get("/")
 def home():
-    return {"status": "Agent is alive", "wallet": "0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a"}
+    return {
+        "agent": "Base Token Parser",
+        "wallet": WALLET_ADDRESS,
+        "price_per_request": f"{PRICE_USDC} USDC",
+        "endpoint": "/tokens",
+        "instructions": f"Send {PRICE_USDC} USDC on Base to {WALLET_ADDRESS}, then call /tokens?tx=YOUR_TX_HASH"
+    }
 
 @app.get("/tokens")
-def get_tokens():
-    url = "https://api.dexscreener.com/latest/dex/tokens/base"
+def get_tokens(tx: str = None):
+    # Проверяем что транзакция передана
+    if not tx:
+        return JSONResponse(
+            status_code=402,
+            content={
+                "error": "Payment Required",
+                "price": f"{PRICE_USDC} USDC",
+                "send_to": WALLET_ADDRESS,
+                "network": "Base",
+                "then_call": f"/tokens?tx=YOUR_TX_HASH"
+            }
+        )
+
+    # Проверяем транзакцию через BaseScan
+    api_url = f"https://api.basescan.org/api?module=transaction&action=gettxreceiptstatus&txhash={tx}&apikey=YourApiKeyToken"
+    try:
+        check = requests.get(api_url, timeout=5)
+        result = check.json()
+        if result.get("status") != "1":
+            return JSONResponse(status_code=402, content={"error": "Transaction not found or failed"})
+    except:
+        pass  # если BaseScan не ответил — пропускаем проверку
+
+    # Отдаём данные
     response = requests.get(
         "https://api.dexscreener.com/latest/dex/search?q=base",
         headers={"User-Agent": "Mozilla/5.0"}
     )
     data = response.json()
-
     pairs = data.get("pairs", [])
     base_tokens = []
 
@@ -36,7 +69,8 @@ def get_tokens():
 
     return {
         "agent": "Base Token Parser",
-        "wallet": "0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a",
+        "wallet": WALLET_ADDRESS,
+        "paid_with_tx": tx,
         "tokens": base_tokens,
         "count": len(base_tokens)
     }
