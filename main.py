@@ -10,7 +10,7 @@ load_dotenv()
 
 app = FastAPI()
 
-# Твой адрес кошелька (уже на месте и жестко в кавычках)
+# Переменные строго в кавычках как текст
 WALLET_ADDRESS = "0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a"
 USDC_ASSET = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 RESOURCE_URL = "https://base-agent-production.up.railway.app/tokens"
@@ -60,9 +60,9 @@ def get_tokens():
         "accepts": [{
             "scheme": "exact",
             "network": "eip155:8453",
-            "amount": "1000",
+            "amount": "1000",  # Выставили правильный минимум платформы (0.001 USDC)
             "asset": str(USDC_ASSET),
-            "payTo": str(WALLET_ADDRESS),
+            "payTo": str(WALLET_ADDRESS),  # Передаем строковую переменную
             "maxTimeoutSeconds": 300,
             "name": "USD Coin",
             "version": "2"
@@ -121,15 +121,14 @@ def get_tokens():
         }
     }
 
-    # Всё кодируется и отдается идеально правильно
-    encoded = base64.urlsafe_b64encode(
-        json.dumps(payment_required).encode('utf-8')
-    ).decode('utf-8')
+    # Возвращаем стандартный b64encode без всяких URL-safe модификаций
+    encoded = base64.b64encode(json.dumps(payment_required).encode('utf-8')).decode('utf-8')
 
+    # Возвращаем классический заголовок PAYMENT-REQUIRED
     return JSONResponse(
         status_code=402,
         headers={
-            "payment-required": encoded,
+            "PAYMENT-REQUIRED": encoded,
             "Content-Type": "application/json"
         },
         content=None
