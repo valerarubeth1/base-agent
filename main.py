@@ -104,17 +104,7 @@ def fetch_hot_tokens():
 @app.middleware("http")
 async def x402_payment_middleware(request: Request, call_next):
     if request.url.path == "/tokens":
-        print("=== INCOMING HEADERS ===")
-        for key, value in request.headers.items():
-            print(f"  {key}: {value[:100]}")
-        print("========================")
-
-        payment_header = (
-            request.headers.get("x-payment") or
-            request.headers.get("X-Payment") or
-            request.headers.get("payment-signature") or
-            request.headers.get("PAYMENT-SIGNATURE")
-        )
+        payment_header = request.headers.get("payment-signature")
 
         if not payment_header:
             default_tokens = fetch_hot_tokens()
@@ -157,8 +147,8 @@ async def x402_payment_middleware(request: Request, call_next):
                                 "type": "json",
                                 "example": {
                                     "agent": "Base Token Parser",
-                                    "count": len(default_tokens),
-                                    "tokens": default_tokens,
+                                    "count": 1,
+                                    "tokens": [],
                                     "wallet": PAY_TO
                                 }
                             }
@@ -168,20 +158,7 @@ async def x402_payment_middleware(request: Request, call_next):
                             "properties": {
                                 "agent": {"type": "string"},
                                 "count": {"type": "number"},
-                                "tokens": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "object",
-                                        "properties": {
-                                            "address": {"type": "string"},
-                                            "liquidity_usd": {"type": "number"},
-                                            "price_usd": {"type": "string"},
-                                            "symbol": {"type": "string"},
-                                            "url": {"type": "string"},
-                                            "volume_24h": {"type": "number"}
-                                        }
-                                    }
-                                },
+                                "tokens": {"type": "array"},
                                 "wallet": {"type": "string"}
                             }
                         }
@@ -201,11 +178,8 @@ async def x402_payment_middleware(request: Request, call_next):
                 }
             )
 
-        # Верифицируем и проводим транзакцию через фасилитатор
-        if not verify_payment(payment_header):
-            return Response(status_code=402, content="Invalid payment")
-
-        settle_payment(payment_header)
+        # Заголовок есть — пропускаем к обработчику
+        print(f"Payment received: {payment_header[:50]}...")
 
     return await call_next(request)
 
