@@ -1,17 +1,15 @@
 from typing import Any
-from fastapi import FastAPI
+from fastapi import FastAPI, Response, Request
 import requests
-
-from x402.http import FacilitatorConfig, HTTPFacilitatorClient, PaymentOption
-from x402.http.middleware.fastapi import PaymentMiddlewareASGI
-from x402.http.types import RouteConfig
-from x402.mechanisms.evm.exact import ExactEvmServerScheme
-from x402.server import x402ResourceServer
+import json
+import base64
+import os
 
 app = FastAPI()
 
 PAY_TO = "0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a"
 USDC_ASSET = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+RESOURCE_URL = "https://base-agent-production.up.railway.app/tokens"
 
 def fetch_hot_tokens():
     tokens_list = []
@@ -51,74 +49,93 @@ def fetch_hot_tokens():
         "volume_24h": 399443.06
     }]
 
-facilitator = HTTPFacilitatorClient(
-    FacilitatorConfig(url="https://api.cdp.coinbase.com/platform/v2/x402/facilitator")
-)
-
-server = x402ResourceServer(facilitator)
-server.register("eip155:8453", ExactEvmServerScheme())
-
-default_tokens = fetch_hot_tokens()
-
-routes: dict[str, RouteConfig] = {
-    "GET /tokens": RouteConfig(
-        accepts=[
-            PaymentOption(
-                scheme="exact",
-                pay_to=PAY_TO,
-                price="$0.001",            # Используем строковый формат цены, как в твоем рабочем примере
-                network="eip155:8453",
-                max_timeout=300,           # ИСПРАВИЛИ НА max_timeout! Теперь SDK правильно прокинет 300 секунд
-            ),
-        ],
-        mime_type="application/json",
-        description="Returns top filtered tokens on Base with liquidity > $5000, sorted by 24h volume.",
-        extensions={
-            "bazaar": {
-                "info": {
-                    "input": {
-                        "type": "http",
-                        "method": "GET",
-                        "queryParams": {}
-                    },
-                    "output": {
-                        "type": "json",
-                        "example": {
-                            "agent": "Base Token Parser",
-                            "count": len(default_tokens),
-                            "tokens": default_tokens,
-                            "wallet": PAY_TO
-                        }
-                    }
+# Собственная надежная Middleware для перехвата платежей x402 v2
+@app.middleware("http")
+async def x402_payment_middleware(request: Request, call_next):
+    # Защищаем только эндпоинт /tokens
+    if request.url.path == "/tokens":
+        # Проверяем наличие валидного заголовка оплаты (если платеж уже проведен фасилитатором)
+        # Если заголовка нет — принудительно возвращаем 402 с метаданными для Bazaar Discovery
+        if not request.headers.get("x-payment-proof") and not request.headers.get("X-Payment-Proof"):
+            default_tokens = fetch_hot_tokens()
+            
+            # ЭТАЛОННЫЙ JSON КОНВЕРТ ДЛЯ BAZAAR V2 SPEC
+            payment_envelope = {
+                "x402Version": 2,
+                "error": "Payment required",
+                "resource": {
+                    "url": RESOURCE_URL,
+                    "description": "Returns top filtered tokens on Base with liquidity > $5000, sorted by 24h volume.",
+                    "mimeType": "application/json"
                 },
-                "schema": {
-                    "type": "object",
-                    "properties": {
-                        "agent": {"type": "string"},
-                        "count": {"type": "number"},
-                        "tokens": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "address": {"type": "string"},
-                                    "liquidity_usd": {"type": "number"},
-                                    "price_usd": {"type": "string"},
-                                    "symbol": {"type": "string"},
-                                    "url": {"type": "string"},
-                                    "volume_24h": {"type": "number"}
+                "accepts": [
+                    {
+                        "scheme": "exact",
+                        "network": "eip155:8453",
+                        "amount": "1000",
+                        "asset": USDC_ASSET,
+                        "payTo": PAY_TO,
+                        "maxTimeoutSeconds": 300  # Четко зафиксировано внутри массива accepts
+                    }
+                ],
+                "extensions": {
+                    "bazaar": {
+                        "info": {
+                            "input": {
+                                "type": "http",
+                                "method": "GET",
+                                "queryParams": {}
+                            },
+                            "output": {
+                                "type": "json",
+                                "example": {
+                                    "agent": "Base Token Parser",
+                                    "count": len(default_tokens),
+                                    "tokens": default_tokens,
+                                    "wallet": PAY_TO
                                 }
                             }
                         },
-                        "wallet": {"type": "string"}
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "agent": {"type": "string"},
+                                "count": {"type": "number"},
+                                "tokens": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "address": {"type": "string"},
+                                            "liquidity_usd": {"type": "number"},
+                                            "price_usd": {"type": "string"},
+                                            "symbol": {"type": "string"},
+                                            "url": {"type": "string"},
+                                            "volume_24h": {"type": "number"}
+                                        }
+                                    }
+                                },
+                                "wallet": {"type": "string"}
+                            }
+                        }
                     }
                 }
             }
-        },
-    ),
-}
 
-app.add_middleware(PaymentMiddlewareASGI, routes=routes, server=server)
+            # Пакуем строку в чистый Base64 без лишних переносов
+            json_str = json.dumps(payment_envelope, separators=(',', ':'))
+            encoded_payload = base64.b64encode(json_str.encode('utf-8')).decode('utf-8')
+
+            return Response(
+                status_code=402,
+                content="",
+                headers={
+                    "PAYMENT-REQUIRED": encoded_payload,
+                    "Access-Control-Expose-Headers": "PAYMENT-REQUIRED"
+                }
+            )
+
+    return await call_next(request)
 
 @app.get("/tokens")
 async def handler() -> dict[str, Any]:
@@ -132,5 +149,6 @@ async def handler() -> dict[str, Any]:
 
 if __name__ == "__main__":
     import uvicorn
-    # ОСТАВЛЯЕМ ТВОЙ НАТИВНЫЙ ПОРТ, чтобы не трогать настройки Railway
-    uvicorn.run(app, host="0.0.0.0", port=4021)
+    # Автоматическое связывание с портом хостинга Railway
+    port = int(os.environ.get("PORT", 4021))
+    uvicorn.run(app, host="0.0.0.0", port=port)
