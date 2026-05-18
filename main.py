@@ -49,17 +49,12 @@ def fetch_hot_tokens():
         "volume_24h": 399443.06
     }]
 
-# Собственная надежная Middleware для перехвата платежей x402 v2
 @app.middleware("http")
 async def x402_payment_middleware(request: Request, call_next):
-    # Защищаем только эндпоинт /tokens
     if request.url.path == "/tokens":
-        # Проверяем наличие валидного заголовка оплаты (если платеж уже проведен фасилитатором)
-        # Если заголовка нет — принудительно возвращаем 402 с метаданными для Bazaar Discovery
         if not request.headers.get("x-payment-proof") and not request.headers.get("X-Payment-Proof"):
             default_tokens = fetch_hot_tokens()
             
-            # ЭТАЛОННЫЙ JSON КОНВЕРТ ДЛЯ BAZAAR V2 SPEC
             payment_envelope = {
                 "x402Version": 2,
                 "error": "Payment required",
@@ -75,7 +70,15 @@ async def x402_payment_middleware(request: Request, call_next):
                         "amount": "1000",
                         "asset": USDC_ASSET,
                         "payTo": PAY_TO,
-                        "maxTimeoutSeconds": 300  # Четко зафиксировано внутри массива accepts
+                        "maxTimeoutSeconds": 300,
+                        "eip712": {
+                            "domain": {
+                                "chainId": 8453,
+                                "name": "USD Coin",
+                                "verifyingContract": USDC_ASSET,
+                                "version": "2"
+                            }
+                        }
                     }
                 ],
                 "extensions": {
@@ -122,7 +125,6 @@ async def x402_payment_middleware(request: Request, call_next):
                 }
             }
 
-            # Пакуем строку в чистый Base64 без лишних переносов
             json_str = json.dumps(payment_envelope, separators=(',', ':'))
             encoded_payload = base64.b64encode(json_str.encode('utf-8')).decode('utf-8')
 
@@ -149,6 +151,5 @@ async def handler() -> dict[str, Any]:
 
 if __name__ == "__main__":
     import uvicorn
-    # Автоматическое связывание с портом хостинга Railway
     port = int(os.environ.get("PORT", 4021))
     uvicorn.run(app, host="0.0.0.0", port=port)
