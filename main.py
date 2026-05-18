@@ -74,7 +74,7 @@ def home():
 
 @app.get("/tokens")
 def get_tokens():
-    return make_402_response()   # всегда 402 для валидации
+    return make_402_response()
 
 
 if __name__ == "__main__":
