@@ -1,4 +1,3 @@
-import os
 import json
 import base64
 from fastapi import FastAPI
@@ -19,20 +18,22 @@ def make_402_response():
             "description": "Fresh Base token data from DexScreener (new pools, volume spikes, risk score)",
             "mimeType": "application/json"
         },
-        "accepts": [{
-    "scheme": "exact",
-    "network": "eip155:8453",
-    "amount": "10000",
-    "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-    "payTo": "0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a",
-    "maxTimeoutSeconds": 300,
-    "name": "USD Coin",           # ← вот это
-    "version": "2",               # ← и это
-    "extra": {
-        "name": "USD Coin",
-        "version": "2"
-    }
-}]
+        "accepts": [
+            {
+                "scheme": "exact",
+                "network": "eip155:8453",
+                "amount": "10000",
+                "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+                "payTo": WALLET_ADDRESS,
+                "maxTimeoutSeconds": 300,
+                "name": "USD Coin",           # ← критично
+                "version": "2",               # ← критично
+                "extra": {
+                    "name": "USD Coin",
+                    "version": "2"
+                }
+            }
+        ],
         "extensions": {
             "bazaar": {
                 "info": {
@@ -40,7 +41,11 @@ def make_402_response():
                     "description": "Returns latest tokens on Base with liquidity, volume and DexScreener links",
                     "category": "onchain-data",
                     "tags": ["base", "tokens", "memes", "dexscreener"],
-                    "input": {"type": "http", "method": "GET", "queryParams": {}},
+                    "input": {
+                        "type": "http",
+                        "method": "GET",
+                        "queryParams": {}
+                    }
                 },
                 "schema": {
                     "type": "object",
@@ -78,11 +83,20 @@ def make_402_response():
     )
 
 
-@app.get("/tokens")
-async def get_tokens():
-    return make_402_response()   # для валидации Bazaar
-
-
 @app.get("/")
-async def home():
-    return {"status": "ok", "endpoint": "/tokens", "price": "0.01 USDC"}
+def home():
+    return {"status": "ok", "price": "0.01 USDC"}
+
+
+@app.get("/tokens")
+def get_tokens():
+    # Для валидации Bazaar всегда возвращаем 402
+    return make_402_response()
+
+    # ← Раскомментируй, когда будешь тестировать оплату
+    # try:
+    #     resp = requests.get("https://api.dexscreener.com/latest/dex/search?q=base", timeout=10)
+    #     data = resp.json()
+    #     # ... твой парсер ...
+    # except Exception as e:
+    #     return {"error": str(e)}
