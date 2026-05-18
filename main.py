@@ -1,25 +1,21 @@
-from fastapi import FastAPI, Response
+from typing import Any
+from fastapi import FastAPI
 import requests
-import json
-import base64
-from dotenv import load_dotenv
-import os
 
-load_dotenv()
+from x402.http import FacilitatorConfig, HTTPFacilitatorClient, PaymentOption
+from x402.http.middleware.fastapi import PaymentMiddlewareASGI
+from x402.http.types import RouteConfig
+from x402.mechanisms.evm.exact import ExactEvmServerScheme
+from x402.server import x402ResourceServer
 
 app = FastAPI()
 
-# Все адреса жестко строками
-WALLET_ADDRESS = "0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a"
+# Базовые константы
+PAY_TO = "0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a"
 USDC_ASSET = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
-RESOURCE_URL = "https://base-agent-production.up.railway.app/tokens"
 
-@app.get('/')
-def home():
-    return {'status': 'ok', 'agent': 'Base Token Parser'}
-
-@app.get('/tokens')
-def get_tokens():
+# Функция для динамического сбора токенов с DexScreener
+def fetch_hot_tokens():
     tokens_list = []
     try:
         response = requests.get('https://api.dexscreener.com/token-profiles/latest/v1', timeout=5)
@@ -44,42 +40,47 @@ def get_tokens():
                                 "url": pair.get('url', ''),
                                 "volume_24h": float(pair.get('volume', {}).get('h24', 0))
                             })
-                    tokens_list = sorted(tokens_list, key=lambda x: x['volume_24h'], reverse=True)[:10]
+                    return sorted(tokens_list, key=lambda x: x['volume_24h'], reverse=True)[:10]
     except Exception as e:
         print(f"Ошибка парсинга DexScreener: {e}")
+    
+    # Дефолтный фолбек, если DexScreener лежит, чтобы не отдавать пустоту
+    return [{
+        "address": "0x099880c1676FF3035Ab1E952E5E83b5A81eecB07",
+        "liquidity_usd": 77934.83,
+        "price_usd": "0.0000009813",
+        "symbol": "GNULL",
+        "url": "https://dexscreener.com/base/0x3676a19715f72f7a7730cc44b26fc515464642f8634dc7f9e6df2f3d7a2d7b79",
+        "volume_24h": 399443.06
+    }]
 
-    # ЭТАЛОННЫЙ JSON СТРОГО ПО КРИТЕРИЯМ ИЗ ТВОЕЙ ДОКУМЕНТАЦИИ BAZAAR
-    payment_required = {
-        "x402Version": 2,
-        "error": "Payment required",
-        "resource": {
-            "url": str(RESOURCE_URL),
-            "description": "Returns top filtered tokens on Base with liquidity > $5000, sorted by 24h volume.",
-            "mimeType": "application/json"
-        },
-        "accepts": [
-            {
-                "scheme": "exact",
-                "network": "eip155:8453",
-                "amount": "1000",
-                "asset": str(USDC_ASSET),
-                "payTo": str(WALLET_ADDRESS),
-                "maxTimeoutSeconds": 300,  # ВОТ ОН! На своем законном месте внутри accepts
-                "maxAmountRequired": "1000",
-                "resource": str(RESOURCE_URL),
-                "description": "Access Base token feed",
-                "mimeType": "application/json",
-                "eip712": {
-                    "domain": {
-                        "chainId": 8453,
-                        "name": "USD Coin",
-                        "verifyingContract": str(USDC_ASSET),
-                        "version": "2"
-                    }
-                }
-            }
+# Подключаем официальный фасилитатор от Coinbase
+facilitator = HTTPFacilitatorClient(
+    FacilitatorConfig(url="https://api.cdp.coinbase.com/platform/v2/x402/facilitator")
+)
+
+server = x402ResourceServer(facilitator)
+server.register("eip155:8453", ExactEvmServerScheme())
+
+# Генерируем пример для блока инициализации метаданных Bazaar
+default_tokens = fetch_hot_tokens()
+
+# Конфигурация защищенных роутов с метаданными Bazaar Discovery
+routes: dict[str, RouteConfig] = {
+    "GET /tokens": RouteConfig(
+        accepts=[
+            PaymentOption(
+                scheme="exact",
+                pay_to=PAY_TO,
+                amount="1000",             # Обязательно передаем строкой в атомных единицах ($0.001)
+                asset=USDC_ASSET,          # Контракт USDC
+                network="eip155:8453",     # Сеть Base
+                max_timeout_seconds=300,   # ВОТ ОНО! Явно прокидываем таймаут в SDK, чтобы он попал в заголовок!
+            ),
         ],
-        "extensions": {
+        mime_type="application/json",
+        description="Returns top filtered tokens on Base with liquidity > $5000, sorted by 24h volume.",
+        extensions={
             "bazaar": {
                 "info": {
                     "input": {
@@ -88,21 +89,12 @@ def get_tokens():
                         "queryParams": {}
                     },
                     "output": {
-                        "type": "json",  # Поменяли на "json", как требует новая спецификация
+                        "type": "json",
                         "example": {
                             "agent": "Base Token Parser",
-                            "count": len(tokens_list),
-                            "tokens": tokens_list if tokens_list else [
-                                {
-                                    "address": "0x099880c1676FF3035Ab1E952E5E83b5A81eecB07",
-                                    "liquidity_usd": 77934.83,
-                                    "price_usd": "0.0000009813",
-                                    "symbol": "GNULL",
-                                    "url": "https://dexscreener.com/base/... ",
-                                    "volume_24h": 399443.06
-                                }
-                            ],
-                            "wallet": str(WALLET_ADDRESS)
+                            "count": len(default_tokens),
+                            "tokens": default_tokens,
+                            "wallet": PAY_TO
                         }
                     }
                 },
@@ -129,21 +121,27 @@ def get_tokens():
                     }
                 }
             }
-        }
+        },
+    ),
+}
+
+# Накатываем middleware, которое будет автоматически перехватывать запросы и слать 402, если нет оплаты
+app.add_middleware(PaymentMiddlewareASGI, routes=routes, server=server)
+
+
+@app.get("/tokens")
+async def handler() -> dict[str, Any]:
+    # Сюда клиент попадет ТОЛЬКО после успешной оплаты через x402 мидлварь
+    hot_tokens = fetch_hot_tokens()
+    return {
+        "agent": "Base Token Parser",
+        "count": len(hot_tokens),
+        "tokens": hot_tokens,
+        "wallet": PAY_TO
     }
 
-    # Кодируем в чистый стандартный Base64
-    encoded = base64.b64encode(json.dumps(payment_required).encode('utf-8')).decode('utf-8')
-
-    # Отдаем через каноничный Response c пустым телом
-    return Response(
-        status_code=402,
-        headers={
-            "PAYMENT-REQUIRED": encoded
-        },
-        content=""
-    )
 
 if __name__ == "__main__":
     import uvicorn
+    # Меняем порт на 8000 (или какой там у тебя прописан в настройках Railway Start Command)
     uvicorn.run(app, host="0.0.0.0", port=8000)
