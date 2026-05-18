@@ -31,7 +31,7 @@ def get_tokens():
             "network": "eip155:8453",
             "amount": "10000",
             "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-            "payTo": f"{0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a}",  # Жесткое приведение к строке для Go-парсера
+            "payTo": f"{0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a}",
             "maxTimeoutSeconds": 300
         }],
         "extensions": {
@@ -46,7 +46,7 @@ def get_tokens():
                         "method": "GET",
                         "queryParams": {}
                     },
-                    # ДОБАВИЛИ OUTPUT, чтобы убрать ошибку "Missing info.output"
+                    # ПЕРЕНЕСЛИ КЛЮЧ EXAMPLE ТУДА, ГДЕ ЕГО ИЩЕТ Go-ПАРСЕР
                     "output": {
                         "type": "object",
                         "properties": {
@@ -54,6 +54,12 @@ def get_tokens():
                             "wallet": {"type": "string"},
                             "tokens": {"type": "array"},
                             "count": {"type": "number"}
+                        },
+                        "example": {
+                            "agent": "Base Token Parser",
+                            "wallet": "0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a",
+                            "tokens": [],
+                            "count": 0
                         }
                     }
                 },
@@ -83,7 +89,7 @@ def get_tokens():
         }
     }
 
-    # Кодируем структуру в base64
+    # Кодируем в base64 строку
     encoded = base64.b64encode(json.dumps(payment_required).encode('utf-8')).decode('utf-8')
 
     # Отдаем пустой body
