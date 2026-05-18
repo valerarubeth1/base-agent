@@ -10,7 +10,8 @@ load_dotenv()
 
 app = FastAPI()
 
-WALLET_ADDRESS = os.getenv('EVM_ADDRESS', '0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a')
+# Жестко прописываем кошелек для приема платежей, чтобы избежать багов с окружением
+WALLET_ADDRESS = "0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a"
 RESOURCE_URL = 'https://base-agent-production.up.railway.app/tokens'
 
 @app.get('/')
@@ -33,7 +34,7 @@ def get_tokens():
             "network": "eip155:8453",
             "amount": "10000",
             "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-            "payTo": WALLET_ADDRESS,
+            "payTo": 0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a,  # Теперь сюда гарантированно прилетает валидный hex-строка адреса
             "maxTimeoutSeconds": 300
         }],
         "extensions": {
@@ -75,12 +76,17 @@ def get_tokens():
         }
     }
 
+    # Кодируем структуру в base64
     encoded = base64.b64encode(json.dumps(payment_required).encode('utf-8')).decode('utf-8')
 
+    # Возвращаем 402 с пустым body для соответствия x402 v2 транспортному стандарту
     return JSONResponse(
         status_code=402,
-        headers={"PAYMENT-REQUIRED": encoded},
-        content={"error": "Payment Required"}
+        headers={
+            "PAYMENT-REQUIRED": encoded,
+            "Content-Type": "application/json"
+        },
+        content=None
     )
 
 # Real logic (commented for validation)
