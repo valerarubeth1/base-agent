@@ -9,7 +9,6 @@ load_dotenv()
 
 app = FastAPI()
 
-# ИСПРАВЛЕНО: Теперь тут ровно 42 символа, это валидный Base/EVM адрес
 WALLET_ADDRESS = "0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a"
 RESOURCE_URL = 'https://base-agent-production.up.railway.app/tokens'
 
@@ -19,7 +18,6 @@ def home():
 
 @app.get('/tokens')
 def get_tokens():
-    # Эталонная структура x402 v2
     payment_required = {
         "x402Version": 2,
         "error": "Payment required",
@@ -33,7 +31,7 @@ def get_tokens():
             "network": "eip155:8453",
             "amount": "10000",
             "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-            "payTo": 0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a,  # Сюда подставится чистый, ровный адрес
+            "payTo": f"{0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a}",  # Жесткое приведение к строке для Go-парсера
             "maxTimeoutSeconds": 300
         }],
         "extensions": {
@@ -47,6 +45,16 @@ def get_tokens():
                         "type": "http",
                         "method": "GET",
                         "queryParams": {}
+                    },
+                    # ДОБАВИЛИ OUTPUT, чтобы убрать ошибку "Missing info.output"
+                    "output": {
+                        "type": "object",
+                        "properties": {
+                            "agent": {"type": "string"},
+                            "wallet": {"type": "string"},
+                            "tokens": {"type": "array"},
+                            "count": {"type": "number"}
+                        }
                     }
                 },
                 "schema": {
@@ -75,10 +83,10 @@ def get_tokens():
         }
     }
 
-    # Кодируем правильный JSON в base64 строку
+    # Кодируем структуру в base64
     encoded = base64.b64encode(json.dumps(payment_required).encode('utf-8')).decode('utf-8')
 
-    # Отдаем пустой body, чтобы не было дублирования контента
+    # Отдаем пустой body
     return JSONResponse(
         status_code=402,
         headers={
