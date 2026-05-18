@@ -1,5 +1,4 @@
-from fastapi import FastAPI
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, Response
 import requests
 import json
 import base64
@@ -10,7 +9,7 @@ load_dotenv()
 
 app = FastAPI()
 
-# Твой адрес кошелька жестко строкой
+# Переменные строго строками
 WALLET_ADDRESS = "0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a"
 USDC_ASSET = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 RESOURCE_URL = "https://base-agent-production.up.railway.app/tokens"
@@ -49,6 +48,7 @@ def get_tokens():
     except Exception as e:
         print(f"Ошибка парсинга DexScreener: {e}")
 
+    # ТОТ САМЫЙ ПРАВИЛЬНЫЙ JSON ДЛЯ EXACT SCHEME
     payment_required = {
         "x402Version": 2,
         "error": "Payment required",
@@ -60,13 +60,22 @@ def get_tokens():
         "accepts": [{
             "scheme": "exact",
             "network": "eip155:8453",
-            "amount": "1000", 
-            "asset": str(USDC_ASSET),
+            "maxAmountRequired": "1000",
+            "resource": str(RESOURCE_URL),
+            "description": "Access Base token feed",
+            "mimeType": "application/json",
             "payTo": str(WALLET_ADDRESS),
-            "maxTimeoutSeconds": 300,
-            # ВОТ ОНИ! РОДНЫЕ! ПРЯМО ТУТ НА СЕРВЕРЕ:
-            "name": "USD Coin",
-            "version": "2"
+            "asset": str(USDC_ASSET),
+            "amount": "1000",
+            # Структура EIP-712 для viem
+            "eip712": {
+                "domain": {
+                    "name": "USD Coin",
+                    "version": "2",
+                    "chainId": 8453,
+                    "verifyingContract": str(USDC_ASSET)
+                }
+            }
         }],
         "extensions": {
             "bazaar": {
@@ -122,16 +131,16 @@ def get_tokens():
         }
     }
 
-    # Стандартный рабочий энкод, который ждет валидатор
+    # Кодируем в обычный Base64
     encoded = base64.b64encode(json.dumps(payment_required).encode('utf-8')).decode('utf-8')
 
-    return JSONResponse(
+    # Возвращаем строго через Response без контента, чтобы не ломать заголовки
+    return Response(
         status_code=402,
         headers={
-            "PAYMENT-REQUIRED": encoded,
-            "Content-Type": "application/json"
+            "PAYMENT-REQUIRED": encoded
         },
-        content=None
+        content=""
     )
 
 if __name__ == "__main__":
