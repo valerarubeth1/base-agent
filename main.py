@@ -16,9 +16,11 @@ def make_402_response():
                 "scheme": "exact",
                 "network": "base",
                 "amount": "10000",
-                "resource": "https://base-agent-production.up.railway.app/tokens",
-                "description": "Pay 0.01 USDC to get fresh Base token data",
-                "mimeType": "application/json",
+                "resource": {
+                    "url": "https://base-agent-production.up.railway.app/tokens",
+                    "description": "Fresh Base token data",
+                    "mimeType": "application/json"
+                },
                 "payTo": WALLET_ADDRESS,
                 "maxTimeoutSeconds": 300,
                 "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
@@ -32,7 +34,10 @@ def make_402_response():
                     "description": "Get fresh token data from Base network including price, volume and liquidity",
                     "category": "data",
                     "tags": ["base", "tokens", "defi", "crypto"],
-                    "output": "Returns JSON array of top 10 tokens on Base network with symbol, name, address, price in USD, 24h volume, and liquidity"
+                    "output": {
+                        "description": "Returns JSON array of top 10 tokens on Base network with symbol, name, address, price in USD, 24h volume, and liquidity",
+                        "contentType": "application/json"
+                    }
                 },
                 "schema": {
                     "type": "object",
