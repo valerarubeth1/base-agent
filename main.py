@@ -1,4 +1,5 @@
-from fastapi import FastAPI, Response
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 import requests
 import json
 import base64
@@ -9,7 +10,7 @@ load_dotenv()
 
 app = FastAPI()
 
-# Все адреса жестко в кавычках как строки
+# Твой адрес кошелька (уже на месте и жестко в кавычках)
 WALLET_ADDRESS = "0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a"
 USDC_ASSET = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 RESOURCE_URL = "https://base-agent-production.up.railway.app/tokens"
@@ -48,7 +49,6 @@ def get_tokens():
     except Exception as e:
         print(f"Ошибка парсинга DexScreener: {e}")
 
-    # Формируем правильный платежный JSON
     payment_required = {
         "x402Version": 2,
         "error": "Payment required",
@@ -60,7 +60,7 @@ def get_tokens():
         "accepts": [{
             "scheme": "exact",
             "network": "eip155:8453",
-            "amount": "1000",  # Вернули необходимый минимум (0.001 USDC)
+            "amount": "1000",
             "asset": str(USDC_ASSET),
             "payTo": str(WALLET_ADDRESS),
             "maxTimeoutSeconds": 300,
@@ -121,19 +121,18 @@ def get_tokens():
         }
     }
 
-    # Твоя гениальная идея: кодируем через urlsafe_b64encode
+    # Всё кодируется и отдается идеально правильно
     encoded = base64.urlsafe_b64encode(
         json.dumps(payment_required).encode('utf-8')
     ).decode('utf-8')
 
-    # Твоя гениальная идея №2: отдаем заголовок в нижнем регистре "payment-required"
-    return Response(
+    return JSONResponse(
         status_code=402,
         headers={
             "payment-required": encoded,
             "Content-Type": "application/json"
         },
-        content=""
+        content=None
     )
 
 if __name__ == "__main__":
