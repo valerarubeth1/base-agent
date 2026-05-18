@@ -60,9 +60,9 @@ def get_tokens():
         "accepts": [{
             "scheme": "exact",
             "network": "eip155:8453",
-            "amount": "1000",  # ВЕРНУЛИ КОРРЕКТНЫЙ МИНИМУМ СУММЫ (0.001 USDC)
+            "amount": "1000",  # Минимум для платформы (0.001 USDC)
             "asset": str(USDC_ASSET),
-            "payTo": str(0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a),
+            "payTo": str(0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a),  # ИСПОЛЬЗУЕМ НАШУ СТРОКОВУЮ ПЕРЕМЕННУЮ
             "maxTimeoutSeconds": 300
         }],
         "extensions": {
