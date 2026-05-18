@@ -9,7 +9,7 @@ load_dotenv()
 
 app = FastAPI()
 
-# Твой адрес кошелька жестко строкой
+# Все адреса жестко строками
 WALLET_ADDRESS = "0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a"
 USDC_ASSET = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 RESOURCE_URL = "https://base-agent-production.up.railway.app/tokens"
@@ -37,71 +37,72 @@ def get_tokens():
                         liquidity = pair.get('liquidity', {}).get('usd', 0)
                         if pair.get('chainId') == 'base' and liquidity >= 5000:
                             tokens_list.append({
-                                "symbol": pair.get('baseToken', {}).get('symbol', 'UNKNOWN'),
                                 "address": pair.get('baseToken', {}).get('address', ''),
-                                "price_usd": pair.get('priceUsd', '0'),
-                                "volume_24h": float(pair.get('volume', {}).get('h24', 0)),
                                 "liquidity_usd": float(liquidity),
-                                "url": pair.get('url', '')
+                                "price_usd": pair.get('priceUsd', '0'),
+                                "symbol": pair.get('baseToken', {}).get('symbol', 'UNKNOWN'),
+                                "url": pair.get('url', ''),
+                                "volume_24h": float(pair.get('volume', {}).get('h24', 0))
                             })
                     tokens_list = sorted(tokens_list, key=lambda x: x['volume_24h'], reverse=True)[:10]
     except Exception as e:
         print(f"Ошибка парсинга DexScreener: {e}")
 
-    # ИДЕАЛЬНАЯ СТРУКТУРА ДЛЯ ВАЛИДАТОРА И ДЛЯ КЛИЕНТА
+    # ЭТАЛОННЫЙ JSON СТРОГО ПО КРИТЕРИЯМ ИЗ ТВОЕЙ ДОКУМЕНТАЦИИ BAZAAR
     payment_required = {
         "x402Version": 2,
         "error": "Payment required",
-        "maxTimeoutSeconds": 60,  # ПЕРЕНЕСЛИ НА САМЫЙ ВЕРХ, как просит валидатор!
         "resource": {
             "url": str(RESOURCE_URL),
-            "description": f"Top {len(tokens_list)} sorted hot Base tokens with liquidity > $5k and high volume.",
+            "description": "Returns top filtered tokens on Base with liquidity > $5000, sorted by 24h volume.",
             "mimeType": "application/json"
         },
-        "accepts": [{
-            "scheme": "exact",
-            "network": "eip155:8453",
-            "maxAmountRequired": "1000",
-            "resource": str(RESOURCE_URL),
-            "description": "Access Base token feed",
-            "mimeType": "application/json",
-            "payTo": str(WALLET_ADDRESS),
-            "asset": str(USDC_ASSET),
-            "amount": "1000",
-            "eip712": {
-                "domain": {
-                    "name": "USD Coin",
-                    "version": "2",
-                    "chainId": 8453,
-                    "verifyingContract": str(USDC_ASSET)
+        "accepts": [
+            {
+                "scheme": "exact",
+                "network": "eip155:8453",
+                "amount": "1000",
+                "asset": str(USDC_ASSET),
+                "payTo": str(WALLET_ADDRESS),
+                "maxTimeoutSeconds": 300,  # ВОТ ОН! На своем законном месте внутри accepts
+                "maxAmountRequired": "1000",
+                "resource": str(RESOURCE_URL),
+                "description": "Access Base token feed",
+                "mimeType": "application/json",
+                "eip712": {
+                    "domain": {
+                        "chainId": 8453,
+                        "name": "USD Coin",
+                        "verifyingContract": str(USDC_ASSET),
+                        "version": "2"
+                    }
                 }
             }
-        }],
+        ],
         "extensions": {
             "bazaar": {
                 "info": {
-                    "name": "Base Ultra-Fresh Tokens Filter",
-                    "description": "Returns top filtered tokens on Base with liquidity > $5000, sorted by 24h volume.",
-                    "category": "onchain-data",
-                    "tags": ["base", "tokens", "memes", "volume-filter", "safe-liquidity"],
                     "input": {
                         "type": "http",
                         "method": "GET",
                         "queryParams": {}
                     },
                     "output": {
-                        "type": "object",
-                        "properties": {
-                            "agent": {"type": "string"},
-                            "wallet": {"type": "string"},
-                            "tokens": {"type": "array"},
-                            "count": {"type": "number"}
-                        },
+                        "type": "json",  # Поменяли на "json", как требует новая спецификация
                         "example": {
                             "agent": "Base Token Parser",
-                            "wallet": str(WALLET_ADDRESS),
-                            "tokens": tokens_list[:1] if tokens_list else [],
-                            "count": len(tokens_list)
+                            "count": len(tokens_list),
+                            "tokens": tokens_list if tokens_list else [
+                                {
+                                    "address": "0x099880c1676FF3035Ab1E952E5E83b5A81eecB07",
+                                    "liquidity_usd": 77934.83,
+                                    "price_usd": "0.0000009813",
+                                    "symbol": "GNULL",
+                                    "url": "https://dexscreener.com/base/... ",
+                                    "volume_24h": 399443.06
+                                }
+                            ],
+                            "wallet": str(WALLET_ADDRESS)
                         }
                     }
                 },
@@ -109,32 +110,32 @@ def get_tokens():
                     "type": "object",
                     "properties": {
                         "agent": {"type": "string"},
-                        "wallet": {"type": "string"},
+                        "count": {"type": "number"},
                         "tokens": {
                             "type": "array",
                             "items": {
                                 "type": "object",
                                 "properties": {
-                                    "symbol": {"type": "string"},
                                     "address": {"type": "string"},
-                                    "price_usd": {"type": "string"},
-                                    "volume_24h": {"type": "number"},
                                     "liquidity_usd": {"type": "number"},
-                                    "url": {"type": "string"}
+                                    "price_usd": {"type": "string"},
+                                    "symbol": {"type": "string"},
+                                    "url": {"type": "string"},
+                                    "volume_24h": {"type": "number"}
                                 }
                             }
                         },
-                        "count": {"type": "number"}
+                        "wallet": {"type": "string"}
                     }
                 }
             }
         }
     }
 
-    # Кодируем строго в стандартный Base64
+    # Кодируем в чистый стандартный Base64
     encoded = base64.b64encode(json.dumps(payment_required).encode('utf-8')).decode('utf-8')
 
-    # Отдаем через чистый Response
+    # Отдаем через каноничный Response c пустым телом
     return Response(
         status_code=402,
         headers={
