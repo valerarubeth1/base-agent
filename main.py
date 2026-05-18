@@ -20,19 +20,19 @@ def make_402_response():
             "mimeType": "application/json"
         },
         "accepts": [{
-            "scheme": "exact",
-            "network": "eip155:8453",
-            "amount": "10000",
-            "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-            "payTo": WALLET_ADDRESS,
-            "maxTimeoutSeconds": 300,
-            "name": "USD Coin",
-            "version": "2",
-            "extra": {
-                "name": "USD Coin",
-                "version": "2"
-            }
-        }],
+    "scheme": "exact",
+    "network": "eip155:8453",
+    "amount": "10000",
+    "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "payTo": "0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a",
+    "maxTimeoutSeconds": 300,
+    "name": "USD Coin",           # ← вот это
+    "version": "2",               # ← и это
+    "extra": {
+        "name": "USD Coin",
+        "version": "2"
+    }
+}]
         "extensions": {
             "bazaar": {
                 "info": {
