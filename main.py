@@ -10,11 +10,9 @@ from x402.server import x402ResourceServer
 
 app = FastAPI()
 
-# Базовые константы
 PAY_TO = "0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a"
 USDC_ASSET = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 
-# Функция для динамического сбора токенов с DexScreener
 def fetch_hot_tokens():
     tokens_list = []
     try:
@@ -44,7 +42,6 @@ def fetch_hot_tokens():
     except Exception as e:
         print(f"Ошибка парсинга DexScreener: {e}")
     
-    # Дефолтный фолбек, если DexScreener лежит, чтобы не отдавать пустоту
     return [{
         "address": "0x099880c1676FF3035Ab1E952E5E83b5A81eecB07",
         "liquidity_usd": 77934.83,
@@ -54,7 +51,6 @@ def fetch_hot_tokens():
         "volume_24h": 399443.06
     }]
 
-# Подключаем официальный фасилитатор от Coinbase
 facilitator = HTTPFacilitatorClient(
     FacilitatorConfig(url="https://api.cdp.coinbase.com/platform/v2/x402/facilitator")
 )
@@ -62,20 +58,17 @@ facilitator = HTTPFacilitatorClient(
 server = x402ResourceServer(facilitator)
 server.register("eip155:8453", ExactEvmServerScheme())
 
-# Генерируем пример для блока инициализации метаданных Bazaar
 default_tokens = fetch_hot_tokens()
 
-# Конфигурация защищенных роутов с метаданными Bazaar Discovery
 routes: dict[str, RouteConfig] = {
     "GET /tokens": RouteConfig(
         accepts=[
             PaymentOption(
                 scheme="exact",
                 pay_to=PAY_TO,
-                amount="1000",             # Обязательно передаем строкой в атомных единицах ($0.001)
-                asset=USDC_ASSET,          # Контракт USDC
-                network="eip155:8453",     # Сеть Base
-                max_timeout_seconds=300,   # ВОТ ОНО! Явно прокидываем таймаут в SDK, чтобы он попал в заголовок!
+                price="$0.001",            # Используем строковый формат цены, как в твоем рабочем примере
+                network="eip155:8453",
+                max_timeout=300,           # ИСПРАВИЛИ НА max_timeout! Теперь SDK правильно прокинет 300 секунд
             ),
         ],
         mime_type="application/json",
@@ -125,13 +118,10 @@ routes: dict[str, RouteConfig] = {
     ),
 }
 
-# Накатываем middleware, которое будет автоматически перехватывать запросы и слать 402, если нет оплаты
 app.add_middleware(PaymentMiddlewareASGI, routes=routes, server=server)
-
 
 @app.get("/tokens")
 async def handler() -> dict[str, Any]:
-    # Сюда клиент попадет ТОЛЬКО после успешной оплаты через x402 мидлварь
     hot_tokens = fetch_hot_tokens()
     return {
         "agent": "Base Token Parser",
@@ -140,8 +130,7 @@ async def handler() -> dict[str, Any]:
         "wallet": PAY_TO
     }
 
-
 if __name__ == "__main__":
     import uvicorn
-    # Меняем порт на 8000 (или какой там у тебя прописан в настройках Railway Start Command)
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # ОСТАВЛЯЕМ ТВОЙ НАТИВНЫЙ ПОРТ, чтобы не трогать настройки Railway
+    uvicorn.run(app, host="0.0.0.0", port=4021)
