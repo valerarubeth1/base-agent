@@ -18,11 +18,9 @@ def fetch_hot_tokens():
         if response.status_code == 200:
             profiles = response.json()
             base_addresses = [p['tokenAddress'] for p in profiles if p.get('chainId') == 'base']
-            
             if base_addresses:
                 addrs_str = ','.join(base_addresses[:30])
                 pairs_res = requests.get(f'https://api.dexscreener.com/latest/dex/tokens/{addrs_str}', timeout=5)
-                
                 if pairs_res.status_code == 200:
                     pairs_data = pairs_res.json().get('pairs', [])
                     for pair in pairs_data:
@@ -39,7 +37,7 @@ def fetch_hot_tokens():
                     return sorted(tokens_list, key=lambda x: x['volume_24h'], reverse=True)[:10]
     except Exception as e:
         print(f"Ошибка парсинга DexScreener: {e}")
-    
+
     return [{
         "address": "0x099880c1676FF3035Ab1E952E5E83b5A81eecB07",
         "liquidity_usd": 77934.83,
@@ -52,9 +50,18 @@ def fetch_hot_tokens():
 @app.middleware("http")
 async def x402_payment_middleware(request: Request, call_next):
     if request.url.path == "/tokens":
-        if not request.headers.get("x-payment-proof") and not request.headers.get("X-Payment-Proof"):
+        has_payment = (
+            request.headers.get("x-payment") or
+            request.headers.get("X-Payment") or
+            request.headers.get("x-payment-proof") or
+            request.headers.get("X-Payment-Proof") or
+            request.headers.get("payment-signature") or
+            request.headers.get("PAYMENT-SIGNATURE")
+        )
+
+        if not has_payment:
             default_tokens = fetch_hot_tokens()
-            
+
             payment_envelope = {
                 "x402Version": 2,
                 "error": "Payment required",
@@ -64,27 +71,27 @@ async def x402_payment_middleware(request: Request, call_next):
                     "mimeType": "application/json"
                 },
                 "accepts": [
-    {
-        "scheme": "exact",
-        "network": "eip155:8453",
-        "amount": "1000",
-        "asset": USDC_ASSET,
-        "payTo": PAY_TO,
-        "maxTimeoutSeconds": 300,
-        "extra": {
-            "name": "USD Coin",
-            "version": "2"
-        },
-        "eip712": {
-            "domain": {
-                "chainId": 8453,
-                "name": "USD Coin",
-                "verifyingContract": USDC_ASSET,
-                "version": "2"
-            }
-        }
-    }
-],
+                    {
+                        "scheme": "exact",
+                        "network": "eip155:8453",
+                        "amount": "1000",
+                        "asset": USDC_ASSET,
+                        "payTo": PAY_TO,
+                        "maxTimeoutSeconds": 300,
+                        "extra": {
+                            "name": "USD Coin",
+                            "version": "2"
+                        },
+                        "eip712": {
+                            "domain": {
+                                "chainId": 8453,
+                                "name": "USD Coin",
+                                "verifyingContract": USDC_ASSET,
+                                "version": "2"
+                            }
+                        }
+                    }
+                ],
                 "extensions": {
                     "bazaar": {
                         "info": {
