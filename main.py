@@ -64,23 +64,25 @@ async def x402_payment_middleware(request: Request, call_next):
                     "mimeType": "application/json"
                 },
                 "accepts": [
-                    {
-                        "scheme": "exact",
-                        "network": "eip155:8453",
-                        "amount": "1000",
-                        "asset": USDC_ASSET,
-                        "payTo": PAY_TO,
-                        "maxTimeoutSeconds": 300,
-                        "eip712": {
-                            "domain": {
-                                "chainId": 8453,
-                                "name": "USD Coin",
-                                "verifyingContract": USDC_ASSET,
-                                "version": "2"
-                            }
-                        }
-                    }
-                ],
+    {
+        "scheme": "exact",
+        "network": "eip155:8453",
+        "amount": "1000",
+        "asset": USDC_ASSET,
+        "payTo": PAY_TO,
+        "maxTimeoutSeconds": 300,
+        "name": "USD Coin",       # ← ADD THIS
+        "version": "2",           # ← ADD THIS
+        "eip712": {
+            "domain": {
+                "chainId": 8453,
+                "name": "USD Coin",
+                "verifyingContract": USDC_ASSET,
+                "version": "2"
+            }
+        }
+    }
+],
                 "extensions": {
                     "bazaar": {
                         "info": {
