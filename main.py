@@ -104,6 +104,11 @@ def fetch_hot_tokens():
 @app.middleware("http")
 async def x402_payment_middleware(request: Request, call_next):
     if request.url.path == "/tokens":
+        print("=== INCOMING HEADERS ===")
+        for key, value in request.headers.items():
+            print(f"  {key}: {value[:100]}")
+        print("========================")
+
         payment_header = (
             request.headers.get("x-payment") or
             request.headers.get("X-Payment") or
