@@ -10,10 +10,10 @@ load_dotenv()
 
 app = FastAPI()
 
-# Явно оборачиваем в str(), чтобы исключить любые приколы с типами данных
+# ЖЕСТКО оборачиваем в str(), чтобы никаких чисел!
 WALLET_ADDRESS = str("0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a")
 USDC_ASSET = str("0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913")
-RESOURCE_URL = 'https://base-agent-production.up.railway.app/tokens'
+RESOURCE_URL = str("https://base-agent-production.up.railway.app/tokens")
 
 @app.get('/')
 def home():
@@ -22,7 +22,6 @@ def home():
 @app.get('/tokens')
 def get_tokens():
     tokens_list = []
-    
     try:
         response = requests.get('https://api.dexscreener.com/token-profiles/latest/v1', timeout=5)
         if response.status_code == 200:
@@ -35,7 +34,6 @@ def get_tokens():
                 
                 if pairs_res.status_code == 200:
                     pairs_data = pairs_res.json().get('pairs', [])
-                    
                     for pair in pairs_data:
                         liquidity = pair.get('liquidity', {}).get('usd', 0)
                         if pair.get('chainId') == 'base' and liquidity >= 5000:
@@ -47,7 +45,6 @@ def get_tokens():
                                 "liquidity_usd": float(liquidity),
                                 "url": pair.get('url', '')
                             })
-                    
                     tokens_list = sorted(tokens_list, key=lambda x: x['volume_24h'], reverse=True)[:10]
     except Exception as e:
         print(f"Ошибка парсинга DexScreener: {e}")
@@ -62,10 +59,10 @@ def get_tokens():
         },
         "accepts": [{
             "scheme": "exact",
-            "network": "eip155:8453",
-            "amount": "100",  # 0.0001 USDC
-            "asset": USDC_ASSET,  # Передается чистая строка
-            "payTo": 0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a,  # Передается чистая строка
+            "network": "eip155:8453", # Живая сеть Base Mainnet
+            "amount": "100",  # Цена 0.0001 USDC
+            "asset": USDC_ASSET,  # СТРОКА!
+            "payTo": 0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a,  # СТРОКА!
             "maxTimeoutSeconds": 300
         }],
         "extensions": {
@@ -133,6 +130,9 @@ def get_tokens():
         content=None
     )
 
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
