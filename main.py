@@ -9,7 +9,7 @@ load_dotenv()
 
 app = FastAPI()
 
-# Переменные строго строками
+# Твой адрес кошелька жестко строкой
 WALLET_ADDRESS = "0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a"
 USDC_ASSET = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 RESOURCE_URL = "https://base-agent-production.up.railway.app/tokens"
@@ -48,10 +48,11 @@ def get_tokens():
     except Exception as e:
         print(f"Ошибка парсинга DexScreener: {e}")
 
-    # ТОТ САМЫЙ ПРАВИЛЬНЫЙ JSON ДЛЯ EXACT SCHEME
+    # ИДЕАЛЬНАЯ СТРУКТУРА ДЛЯ ВАЛИДАТОРА И ДЛЯ КЛИЕНТА
     payment_required = {
         "x402Version": 2,
         "error": "Payment required",
+        "maxTimeoutSeconds": 60,  # ПЕРЕНЕСЛИ НА САМЫЙ ВЕРХ, как просит валидатор!
         "resource": {
             "url": str(RESOURCE_URL),
             "description": f"Top {len(tokens_list)} sorted hot Base tokens with liquidity > $5k and high volume.",
@@ -67,7 +68,6 @@ def get_tokens():
             "payTo": str(WALLET_ADDRESS),
             "asset": str(USDC_ASSET),
             "amount": "1000",
-            # Структура EIP-712 для viem
             "eip712": {
                 "domain": {
                     "name": "USD Coin",
@@ -131,10 +131,10 @@ def get_tokens():
         }
     }
 
-    # Кодируем в обычный Base64
+    # Кодируем строго в стандартный Base64
     encoded = base64.b64encode(json.dumps(payment_required).encode('utf-8')).decode('utf-8')
 
-    # Возвращаем строго через Response без контента, чтобы не ломать заголовки
+    # Отдаем через чистый Response
     return Response(
         status_code=402,
         headers={
