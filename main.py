@@ -12,18 +12,21 @@ def make_402_response():
     payment_required = {
         "x402Version": 2,
         "accepts": [
-            {
-                "scheme": "exact",
-                "network": "base",
-                "amount": "10000",
-                "resource": "https://base-agent-production.up.railway.app/tokens",
-                "description": "Fresh Base token data",
-                "mimeType": "application/json",
-                "payTo": WALLET_ADDRESS,
-                "maxTimeoutSeconds": 300,
-                "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
-            }
-        ],
+    {
+        "scheme": "exact",
+        "network": "base",
+        "amount": "10000",
+        "resource": {
+            "url": "https://base-agent-production.up.railway.app/tokens",
+            "description": "Fresh Base token data from DexScreener",
+            "mimeType": "application/json"
+        },
+        "resource.url": "https://base-agent-production.up.railway.app/tokens",
+        "payTo": WALLET_ADDRESS,
+        "maxTimeoutSeconds": 300,
+        "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+    }
+],
         "error": "Payment required to access this endpoint",
         "extensions": {
             "bazaar": {
