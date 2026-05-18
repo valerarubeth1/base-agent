@@ -1,35 +1,84 @@
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 import requests
+import json
+import base64
 
 app = FastAPI()
 
 WALLET_ADDRESS = "0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a"
-PRICE_USDC = 0.01
+
+def make_402_response():
+    payment_required = {
+        "x402Version": 2,
+        "accepts": [
+            {
+                "scheme": "exact",
+                "network": "base",
+                "maxAmountRequired": "10000",
+                "resource": "https://base-agent-production.up.railway.app/tokens",
+                "description": "Pay 0.01 USDC to get fresh Base token data",
+                "mimeType": "application/json",
+                "payTo": WALLET_ADDRESS,
+                "maxTimeoutSeconds": 300,
+                "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+                "extra": {
+                    "name": "USD Coin",
+                    "version": "2"
+                }
+            }
+        ],
+        "error": "Payment required to access this endpoint",
+        "extensions": {
+            "bazaar": {
+                "info": {
+                    "name": "Base Token Parser",
+                    "description": "Get fresh token data from Base network including price, volume and liquidity",
+                    "category": "data",
+                    "tags": ["base", "tokens", "defi", "crypto"]
+                },
+                "outputMetadata": {
+                    "contentType": "application/json"
+                },
+                "outputExample": {
+                    "agent": "Base Token Parser",
+                    "tokens": [
+                        {
+                            "symbol": "TOKEN",
+                            "name": "Token Name",
+                            "price_usd": "0.001",
+                            "volume_24h": 1000,
+                            "liquidity_usd": 50000
+                        }
+                    ]
+                }
+            }
+        }
+    }
+    
+    encoded = base64.b64encode(json.dumps(payment_required).encode()).decode()
+    
+    return Response(
+        status_code=402,
+        headers={"PAYMENT-REQUIRED": encoded},
+        content=json.dumps({"error": "Payment Required"}),
+        media_type="application/json"
+    )
 
 @app.get("/")
 def home():
     return {
         "agent": "Base Token Parser",
         "wallet": WALLET_ADDRESS,
-        "price_per_request": f"{PRICE_USDC} USDC",
+        "price_per_request": "0.01 USDC",
         "endpoint": "/tokens",
-        "instructions": f"Send {PRICE_USDC} USDC on Base to {WALLET_ADDRESS}, then call /tokens?tx=YOUR_TX_HASH"
+        "network": "base"
     }
 
 @app.get("/tokens")
 def get_tokens(tx: str = None):
     if not tx or not tx.startswith("0x") or len(tx) < 60:
-        return JSONResponse(
-            status_code=402,
-            content={
-                "error": "Payment Required",
-                "price": f"{PRICE_USDC} USDC",
-                "send_to": WALLET_ADDRESS,
-                "network": "Base",
-                "then_call": "/tokens?tx=YOUR_TX_HASH"
-            }
-        )
+        return make_402_response()
 
     response = requests.get(
         "https://api.dexscreener.com/latest/dex/search?q=base",
