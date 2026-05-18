@@ -71,8 +71,10 @@ async def x402_payment_middleware(request: Request, call_next):
         "asset": USDC_ASSET,
         "payTo": PAY_TO,
         "maxTimeoutSeconds": 300,
-        "name": "USD Coin",       # ← ADD THIS
-        "version": "2",           # ← ADD THIS
+        "extra": {
+            "name": "USD Coin",
+            "version": "2"
+        },
         "eip712": {
             "domain": {
                 "chainId": 8453,
