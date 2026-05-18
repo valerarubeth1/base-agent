@@ -10,6 +10,60 @@ app = FastAPI()
 PAY_TO = "0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a"
 USDC_ASSET = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 RESOURCE_URL = "https://base-agent-production.up.railway.app/tokens"
+FACILITATOR_URL = "https://x402.org/facilitator"
+
+def verify_payment(payment_header: str) -> bool:
+    try:
+        res = requests.post(
+            f"{FACILITATOR_URL}/verify",
+            json={
+                "payment": payment_header,
+                "paymentRequirements": {
+                    "scheme": "exact",
+                    "network": "eip155:8453",
+                    "amount": "1000",
+                    "asset": USDC_ASSET,
+                    "payTo": PAY_TO,
+                    "maxTimeoutSeconds": 300,
+                    "extra": {
+                        "name": "USD Coin",
+                        "version": "2"
+                    }
+                }
+            },
+            timeout=10
+        )
+        return res.status_code == 200 and res.json().get("isValid", False)
+    except Exception as e:
+        print(f"Ошибка верификации: {e}")
+        return False
+
+def settle_payment(payment_header: str) -> bool:
+    try:
+        res = requests.post(
+            f"{FACILITATOR_URL}/settle",
+            json={
+                "payment": payment_header,
+                "paymentRequirements": {
+                    "scheme": "exact",
+                    "network": "eip155:8453",
+                    "amount": "1000",
+                    "asset": USDC_ASSET,
+                    "payTo": PAY_TO,
+                    "maxTimeoutSeconds": 300,
+                    "extra": {
+                        "name": "USD Coin",
+                        "version": "2"
+                    }
+                }
+            },
+            timeout=10
+        )
+        print(f"Settle response: {res.status_code} {res.text}")
+        return res.status_code == 200
+    except Exception as e:
+        print(f"Ошибка settle: {e}")
+        return False
 
 def fetch_hot_tokens():
     tokens_list = []
@@ -50,16 +104,14 @@ def fetch_hot_tokens():
 @app.middleware("http")
 async def x402_payment_middleware(request: Request, call_next):
     if request.url.path == "/tokens":
-        has_payment = (
+        payment_header = (
             request.headers.get("x-payment") or
             request.headers.get("X-Payment") or
-            request.headers.get("x-payment-proof") or
-            request.headers.get("X-Payment-Proof") or
             request.headers.get("payment-signature") or
             request.headers.get("PAYMENT-SIGNATURE")
         )
 
-        if not has_payment:
+        if not payment_header:
             default_tokens = fetch_hot_tokens()
 
             payment_envelope = {
@@ -95,11 +147,7 @@ async def x402_payment_middleware(request: Request, call_next):
                 "extensions": {
                     "bazaar": {
                         "info": {
-                            "input": {
-                                "type": "http",
-                                "method": "GET",
-                                "queryParams": {}
-                            },
+                            "input": {"type": "http", "method": "GET", "queryParams": {}},
                             "output": {
                                 "type": "json",
                                 "example": {
@@ -147,6 +195,12 @@ async def x402_payment_middleware(request: Request, call_next):
                     "Access-Control-Expose-Headers": "PAYMENT-REQUIRED"
                 }
             )
+
+        # Верифицируем и проводим транзакцию через фасилитатор
+        if not verify_payment(payment_header):
+            return Response(status_code=402, content="Invalid payment")
+
+        settle_payment(payment_header)
 
     return await call_next(request)
 
