@@ -9,6 +9,7 @@ app = FastAPI()
 WALLET_ADDRESS = "0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a"
 RESOURCE_URL = "https://base-agent-production.up.railway.app/tokens"
 
+
 def make_402_response():
     payload = {
         "x402Version": 2,
@@ -26,8 +27,8 @@ def make_402_response():
                 "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
                 "payTo": WALLET_ADDRESS,
                 "maxTimeoutSeconds": 300,
-                "name": "USD Coin",           # ← критично
-                "version": "2",               # ← критично
+                "name": "USD Coin",
+                "version": "2",
                 "extra": {
                     "name": "USD Coin",
                     "version": "2"
@@ -85,18 +86,50 @@ def make_402_response():
 
 @app.get("/")
 def home():
-    return {"status": "ok", "price": "0.01 USDC"}
+    return {
+        "agent": "Base Token Parser",
+        "wallet": WALLET_ADDRESS,
+        "price": "0.01 USDC",
+        "status": "ready"
+    }
 
 
 @app.get("/tokens")
 def get_tokens():
-    # Для валидации Bazaar всегда возвращаем 402
+    # Для валидации Agentic Market всегда возвращаем 402
     return make_402_response()
 
-    # ← Раскомментируй, когда будешь тестировать оплату
+    # ← Когда всё заработает — раскомментируй настоящий парсер:
     # try:
-    #     resp = requests.get("https://api.dexscreener.com/latest/dex/search?q=base", timeout=10)
+    #     resp = requests.get(
+    #         "https://api.dexscreener.com/latest/dex/search?q=base",
+    #         headers={"User-Agent": "x402-BaseAgent"},
+    #         timeout=10
+    #     )
     #     data = resp.json()
-    #     # ... твой парсер ...
+    #     pairs = data.get("pairs", [])[:15]
+    #     tokens = []
+    #     for p in pairs:
+    #         if p.get("chainId") != "base":
+    #             continue
+    #         tokens.append({
+    #             "symbol": p.get("baseToken", {}).get("symbol", "???"),
+    #             "address": p.get("baseToken", {}).get("address", ""),
+    #             "price_usd": p.get("priceUsd", "0"),
+    #             "volume_24h": p.get("volume", {}).get("h24", 0),
+    #             "liquidity_usd": p.get("liquidity", {}).get("usd", 0),
+    #             "url": f"https://dexscreener.com/base/{p.get('pairAddress','')}"
+    #         })
+    #     return {
+    #         "agent": "Base Fresh Tokens Parser",
+    #         "wallet": WALLET_ADDRESS,
+    #         "tokens": tokens,
+    #         "count": len(tokens)
+    #     }
     # except Exception as e:
-    #     return {"error": str(e)}
+    #     return {"error": str(e)}, 500
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
