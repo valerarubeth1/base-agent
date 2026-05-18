@@ -16,11 +16,9 @@ def make_402_response():
                 "scheme": "exact",
                 "network": "base",
                 "amount": "10000",
-                "resource": {
-                    "url": "https://base-agent-production.up.railway.app/tokens",
-                    "description": "Fresh Base token data",
-                    "mimeType": "application/json"
-                },
+                "resource": "https://base-agent-production.up.railway.app/tokens",
+                "description": "Fresh Base token data",
+                "mimeType": "application/json",
                 "payTo": WALLET_ADDRESS,
                 "maxTimeoutSeconds": 300,
                 "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
@@ -36,7 +34,23 @@ def make_402_response():
                     "tags": ["base", "tokens", "defi", "crypto"],
                     "output": {
                         "description": "Returns JSON array of top 10 tokens on Base network with symbol, name, address, price in USD, 24h volume, and liquidity",
-                        "contentType": "application/json"
+                        "contentType": "application/json",
+                        "example": {
+                            "agent": "Base Token Parser",
+                            "wallet": "0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a",
+                            "tokens": [
+                                {
+                                    "symbol": "USDC",
+                                    "name": "USD Coin",
+                                    "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+                                    "price_usd": "1.00",
+                                    "volume_24h": 500000,
+                                    "liquidity_usd": 1000000,
+                                    "url": "https://dexscreener.com/base/0x..."
+                                }
+                            ],
+                            "count": 10
+                        }
                     }
                 },
                 "schema": {
@@ -61,22 +75,6 @@ def make_402_response():
                         },
                         "count": {"type": "number"}
                     }
-                },
-                "outputExample": {
-                    "agent": "Base Token Parser",
-                    "wallet": "0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a",
-                    "tokens": [
-                        {
-                            "symbol": "USDC",
-                            "name": "USD Coin",
-                            "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-                            "price_usd": "1.00",
-                            "volume_24h": 500000,
-                            "liquidity_usd": 1000000,
-                            "url": "https://dexscreener.com/base/0x..."
-                        }
-                    ],
-                    "count": 10
                 }
             }
         }
