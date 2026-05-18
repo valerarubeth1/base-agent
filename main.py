@@ -10,7 +10,9 @@ load_dotenv()
 
 app = FastAPI()
 
-WALLET_ADDRESS = "0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a"
+# Явно оборачиваем в str(), чтобы исключить любые приколы с типами данных
+WALLET_ADDRESS = str("0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a")
+USDC_ASSET = str("0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913")
 RESOURCE_URL = 'https://base-agent-production.up.railway.app/tokens'
 
 @app.get('/')
@@ -22,7 +24,6 @@ def get_tokens():
     tokens_list = []
     
     try:
-        # Свежие профили токенов с DexScreener
         response = requests.get('https://api.dexscreener.com/token-profiles/latest/v1', timeout=5)
         if response.status_code == 200:
             profiles = response.json()
@@ -37,7 +38,6 @@ def get_tokens():
                     
                     for pair in pairs_data:
                         liquidity = pair.get('liquidity', {}).get('usd', 0)
-                        # Наш фильтр: только сеть Base и ликвидность > $5000
                         if pair.get('chainId') == 'base' and liquidity >= 5000:
                             tokens_list.append({
                                 "symbol": pair.get('baseToken', {}).get('symbol', 'UNKNOWN'),
@@ -48,7 +48,6 @@ def get_tokens():
                                 "url": pair.get('url', '')
                             })
                     
-                    # Сортировка по объему торгов за 24 часа
                     tokens_list = sorted(tokens_list, key=lambda x: x['volume_24h'], reverse=True)[:10]
     except Exception as e:
         print(f"Ошибка парсинга DexScreener: {e}")
@@ -64,9 +63,9 @@ def get_tokens():
         "accepts": [{
             "scheme": "exact",
             "network": "eip155:8453",
-            "amount": "100",  # ИЗМЕНИЛИ С 1000 НА 100 (теперь цена всего 0.0001 USDC!)
-            "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-            "payTo": f"{0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a}",
+            "amount": "100",  # 0.0001 USDC
+            "asset": USDC_ASSET,  # Передается чистая строка
+            "payTo": 0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a,  # Передается чистая строка
             "maxTimeoutSeconds": 300
         }],
         "extensions": {
@@ -91,7 +90,7 @@ def get_tokens():
                         },
                         "example": {
                             "agent": "Base Token Parser",
-                            "wallet": "0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a",
+                            "wallet": WALLET_ADDRESS,
                             "tokens": tokens_list[:1] if tokens_list else [],
                             "count": len(tokens_list)
                         }
@@ -123,7 +122,6 @@ def get_tokens():
         }
     }
 
-    # Упаковываем в base64
     encoded = base64.b64encode(json.dumps(payment_required).encode('utf-8')).decode('utf-8')
 
     return JSONResponse(
