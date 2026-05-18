@@ -10,10 +10,10 @@ load_dotenv()
 
 app = FastAPI()
 
-# ЖЕСТКО оборачиваем в str(), чтобы никаких чисел!
-WALLET_ADDRESS = str("0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a")
-USDC_ASSET = str("0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913")
-RESOURCE_URL = str("https://base-agent-production.up.railway.app/tokens")
+# Жестко объявляем адреса строками
+WALLET_ADDRESS = "0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a"
+USDC_ASSET = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+RESOURCE_URL = "https://base-agent-production.up.railway.app/tokens"
 
 @app.get('/')
 def home():
@@ -53,16 +53,16 @@ def get_tokens():
         "x402Version": 2,
         "error": "Payment required",
         "resource": {
-            "url": RESOURCE_URL,
+            "url": str(RESOURCE_URL),
             "description": f"Top {len(tokens_list)} sorted hot Base tokens with liquidity > $5k and high volume.",
             "mimeType": "application/json"
         },
         "accepts": [{
             "scheme": "exact",
-            "network": "eip155:8453", # Живая сеть Base Mainnet
-            "amount": "100",  # Цена 0.0001 USDC
-            "asset": USDC_ASSET,  # СТРОКА!
-            "payTo": 0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a,  # СТРОКА!
+            "network": "eip155:8453",
+            "amount": "1000",  # ВЕРНУЛИ КОРРЕКТНЫЙ МИНИМУМ СУММЫ (0.001 USDC)
+            "asset": str(USDC_ASSET),
+            "payTo": str(0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a),
             "maxTimeoutSeconds": 300
         }],
         "extensions": {
@@ -87,7 +87,7 @@ def get_tokens():
                         },
                         "example": {
                             "agent": "Base Token Parser",
-                            "wallet": WALLET_ADDRESS,
+                            "wallet": str(WALLET_ADDRESS), # ТУТ ТОЖЕ СДЕЛАЛИ ЖЕСТКУЮ СТРОКУ
                             "tokens": tokens_list[:1] if tokens_list else [],
                             "count": len(tokens_list)
                         }
@@ -130,9 +130,6 @@ def get_tokens():
         content=None
     )
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
