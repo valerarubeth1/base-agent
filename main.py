@@ -62,7 +62,7 @@ def get_tokens():
             "network": "eip155:8453",
             "amount": "1000",  # 0.001 USDC минимум для Bazaar
             "asset": str(USDC_ASSET),
-            "payTo": str(WALLET_ADDRESS),  # ДОЛЖНО БЫТЬ ТАК! Никаких 0x... в скобках!
+            "payTo": str(0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a),  # ДОЛЖНО БЫТЬ ТАК! Никаких 0x... в скобках!
             "maxTimeoutSeconds": 300
         }],
         "extensions": {
