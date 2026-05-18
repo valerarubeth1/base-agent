@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import Response
 import requests
 import json
 import base64
@@ -15,17 +15,13 @@ def make_402_response():
             {
                 "scheme": "exact",
                 "network": "base",
-                "maxAmountRequired": "10000",
+                "amount": "10000",
                 "resource": "https://base-agent-production.up.railway.app/tokens",
                 "description": "Pay 0.01 USDC to get fresh Base token data",
                 "mimeType": "application/json",
                 "payTo": WALLET_ADDRESS,
                 "maxTimeoutSeconds": 300,
-                "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-                "extra": {
-                    "name": "USD Coin",
-                    "version": "2"
-                }
+                "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
             }
         ],
         "error": "Payment required to access this endpoint",
@@ -35,29 +31,54 @@ def make_402_response():
                     "name": "Base Token Parser",
                     "description": "Get fresh token data from Base network including price, volume and liquidity",
                     "category": "data",
-                    "tags": ["base", "tokens", "defi", "crypto"]
+                    "tags": ["base", "tokens", "defi", "crypto"],
+                    "output": "Returns JSON array of top 10 tokens on Base network with symbol, name, address, price in USD, 24h volume, and liquidity"
                 },
-                "outputMetadata": {
-                    "contentType": "application/json"
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "agent": {"type": "string"},
+                        "wallet": {"type": "string"},
+                        "tokens": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "symbol": {"type": "string"},
+                                    "name": {"type": "string"},
+                                    "address": {"type": "string"},
+                                    "price_usd": {"type": "string"},
+                                    "volume_24h": {"type": "number"},
+                                    "liquidity_usd": {"type": "number"},
+                                    "url": {"type": "string"}
+                                }
+                            }
+                        },
+                        "count": {"type": "number"}
+                    }
                 },
                 "outputExample": {
                     "agent": "Base Token Parser",
+                    "wallet": "0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a",
                     "tokens": [
                         {
-                            "symbol": "TOKEN",
-                            "name": "Token Name",
-                            "price_usd": "0.001",
-                            "volume_24h": 1000,
-                            "liquidity_usd": 50000
+                            "symbol": "USDC",
+                            "name": "USD Coin",
+                            "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+                            "price_usd": "1.00",
+                            "volume_24h": 500000,
+                            "liquidity_usd": 1000000,
+                            "url": "https://dexscreener.com/base/0x..."
                         }
-                    ]
+                    ],
+                    "count": 10
                 }
             }
         }
     }
-    
+
     encoded = base64.b64encode(json.dumps(payment_required).encode()).decode()
-    
+
     return Response(
         status_code=402,
         headers={"PAYMENT-REQUIRED": encoded},
