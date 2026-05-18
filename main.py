@@ -9,21 +9,27 @@ def home():
 
 @app.get("/tokens")
 def get_tokens():
-    url = "https://api.dexscreener.com/token-profiles/latest/v1"
-    response = requests.get(url)
+    url = "https://api.dexscreener.com/latest/dex/tokens/base"
+    response = requests.get(
+        "https://api.dexscreener.com/latest/dex/search?q=base",
+        headers={"User-Agent": "Mozilla/5.0"}
+    )
     data = response.json()
 
+    pairs = data.get("pairs", [])
     base_tokens = []
-    for t in data:
-        if not isinstance(t, dict):
-            continue
-        if t.get("chainId") != "base":
+
+    for p in pairs:
+        if p.get("chainId") != "base":
             continue
         base_tokens.append({
-            "symbol": t.get("header", t.get("description", "unknown"))[:20],
-            "address": t.get("tokenAddress", ""),
-            "links": [l.get("url","") for l in t.get("links", [])[:2]],
-            "url": t.get("url", "")
+            "symbol": p.get("baseToken", {}).get("symbol", "???"),
+            "name": p.get("baseToken", {}).get("name", "???"),
+            "address": p.get("baseToken", {}).get("address", ""),
+            "price_usd": p.get("priceUsd", "0"),
+            "volume_24h": p.get("volume", {}).get("h24", 0),
+            "liquidity_usd": p.get("liquidity", {}).get("usd", 0),
+            "url": f"https://dexscreener.com/base/{p.get('pairAddress','')}"
         })
         if len(base_tokens) >= 10:
             break
