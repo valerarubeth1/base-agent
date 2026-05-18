@@ -14,7 +14,7 @@ def make_402_response():
         "accepts": [
     {
         "scheme": "exact",
-        "network": "base",
+        "network": "eip155:8453",
         "amount": "10000",
         "resource": {
             "url": "https://base-agent-production.up.railway.app/tokens",
