@@ -1,6 +1,5 @@
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-import requests
 import json
 import base64
 from dotenv import load_dotenv
@@ -19,7 +18,7 @@ def home():
 
 @app.get('/tokens')
 def get_tokens():
-    # Always return 402 for validation
+    # Нам нужно вынести bazaar на правильный уровень согласно репозиторию x402-foundation v2
     payment_required = {
         "x402Version": 2,
         "error": "Payment required",
@@ -36,18 +35,17 @@ def get_tokens():
             "payTo": 0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a,
             "maxTimeoutSeconds": 300
         }],
+        # В v2 спецификации блок bazaarinfo и схема парсятся как расширения верхнего уровня внутри bz-модулей
         "extensions": {
             "bazaar": {
-                "info": {
-                    "name": "Base Fresh Tokens Parser",
-                    "description": "Returns latest tokens on Base with liquidity, volume and DexScreener links",
-                    "category": "onchain-data",
-                    "tags": ["base", "tokens", "memes", "dexscreener"],
-                    "input": {
-                        "type": "http",
-                        "method": "GET",
-                        "queryParams": {}
-                    }
+                "name": "Base Fresh Tokens Parser",
+                "description": "Returns latest tokens on Base with liquidity, volume and DexScreener links",
+                "category": "onchain-data",
+                "tags": ["base", "tokens", "memes", "dexscreener"],
+                "input": {
+                    "type": "http",
+                    "method": "GET",
+                    "queryParams": {}
                 },
                 "schema": {
                     "type": "object",
@@ -75,10 +73,10 @@ def get_tokens():
         }
     }
 
-    # Кодируем структуру в base64
+    # Кодируем в base64
     encoded = base64.b64encode(json.dumps(payment_required).encode('utf-8')).decode('utf-8')
 
-    # Возвращаем 402 с пустым body для соответствия x402 v2
+    # Отдаем пустой body
     return JSONResponse(
         status_code=402,
         headers={
