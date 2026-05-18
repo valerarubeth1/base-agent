@@ -20,8 +20,8 @@ def make_402_response():
             {
                 "scheme": "exact",
                 "network": "eip155:8453",
-                "amount": "10000",           # 0.01 USDC
-                "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",  # USDC on Base
+                "amount": "10000",                    # 0.01 USDC (6 decimals)
+                "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
                 "payTo": WALLET_ADDRESS,
                 "maxTimeoutSeconds": 300
             }
@@ -29,15 +29,24 @@ def make_402_response():
         "extensions": {
             "bazaar": {
                 "info": {
-                    "name": "Base Token Parser",
-                    "description": "Get fresh token data from Base network",
+                    "name": "Base Fresh Tokens Parser",
+                    "description": "Returns latest tokens on Base with liquidity, volume and DexScreener links",
                     "category": "onchain-data",
                     "tags": ["base", "tokens", "memes", "dexscreener"],
                     "output": {
                         "description": "JSON with fresh tokens",
                         "contentType": "application/json",
                         "example": {
-                            "tokens": [...],
+                            "tokens": [
+                                {
+                                    "symbol": "EXAMPLE",
+                                    "address": "0x...",
+                                    "price_usd": "0.0123",
+                                    "volume_24h": 450000,
+                                    "liquidity_usd": 125000,
+                                    "url": "https://dexscreener.com/base/..."
+                                }
+                            ],
                             "count": 10
                         }
                     }
@@ -59,50 +68,45 @@ def home():
         "agent": "Base Token Parser",
         "wallet": WALLET_ADDRESS,
         "price_per_request": "0.01 USDC",
-        "endpoint": "/tokens",
-        "network": "base"
+        "endpoint": "/tokens"
     }
 
 
 @app.get("/tokens")
 def get_tokens():
-    # Проверка оплаты через заголовок (x402-client его добавляет)
-    payment_header = None  # Здесь можно добавить проверку, если нужно
-    # if not payment_header:   # пока закомментировано для теста
-    #     return make_402_response()
+    # ←←←←←←←←←←←←←←←←←←←←←←←←←←←←
+    # Для Agentic Market всегда возвращаем 402, пока не оплатил
+    return make_402_response()
 
-    # === Основная логика парсера ===
-    try:
-        resp = requests.get(
-            "https://api.dexscreener.com/latest/dex/search?q=base",
-            headers={"User-Agent": "Mozilla/5.0"},
-            timeout=10
-        )
-        data = resp.json()
-        pairs = data.get("pairs", [])
+    # ← Раскомментируй ниже, когда будешь тестировать оплату
+    # try:
+    #     resp = requests.get(
+    #         "https://api.dexscreener.com/latest/dex/search?q=base",
+    #         headers={"User-Agent": "x402-BaseAgent"},
+    #         timeout=8
+    #     )
+    #     data = resp.json()
+    #     pairs = data.get("pairs", [])[:15]
 
-        tokens = []
-        for p in pairs:
-            if p.get("chainId") != "base":
-                continue
-            tokens.append({
-                "symbol": p.get("baseToken", {}).get("symbol", "???"),
-                "name": p.get("baseToken", {}).get("name", "???"),
-                "address": p.get("baseToken", {}).get("address", ""),
-                "price_usd": p.get("priceUsd", "0"),
-                "volume_24h": p.get("volume", {}).get("h24", 0),
-                "liquidity_usd": p.get("liquidity", {}).get("usd", 0),
-                "url": f"https://dexscreener.com/base/{p.get('pairAddress', '')}"
-            })
-            if len(tokens) >= 15:
-                break
+    #     tokens = []
+    #     for p in pairs:
+    #         if p.get("chainId") != "base":
+    #             continue
+    #         tokens.append({
+    #             "symbol": p.get("baseToken", {}).get("symbol", "???"),
+    #             "address": p.get("baseToken", {}).get("address", ""),
+    #             "price_usd": p.get("priceUsd", "0"),
+    #             "volume_24h": p.get("volume", {}).get("h24", 0),
+    #             "liquidity_usd": p.get("liquidity", {}).get("usd", 0),
+    #             "url": f"https://dexscreener.com/base/{p.get('pairAddress','')}"
+    #         })
 
-        return {
-            "agent": "Base Token Parser",
-            "wallet": WALLET_ADDRESS,
-            "tokens": tokens,
-            "count": len(tokens),
-            "timestamp": "2026-05-18"
-        }
-    except Exception as e:
-        return {"error": str(e)}, 500
+    #     return {
+    #         "agent": "Base Token Parser",
+    #         "wallet": WALLET_ADDRESS,
+    #         "tokens": tokens,
+    #         "count": len(tokens),
+    #         "timestamp": "2026-05-18"
+    #     }
+    # except Exception as e:
+    #     return {"error": str(e)}, 500
