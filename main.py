@@ -1,12 +1,11 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 import requests
-import os
 
 app = FastAPI()
 
 WALLET_ADDRESS = "0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a"
-PRICE_USDC = 0.01  # цена за запрос
+PRICE_USDC = 0.01
 
 @app.get("/")
 def home():
@@ -20,8 +19,7 @@ def home():
 
 @app.get("/tokens")
 def get_tokens(tx: str = None):
-    # Проверяем что транзакция передана
-    if not tx:
+    if not tx or not tx.startswith("0x") or len(tx) < 60:
         return JSONResponse(
             status_code=402,
             content={
@@ -29,21 +27,10 @@ def get_tokens(tx: str = None):
                 "price": f"{PRICE_USDC} USDC",
                 "send_to": WALLET_ADDRESS,
                 "network": "Base",
-                "then_call": f"/tokens?tx=YOUR_TX_HASH"
+                "then_call": "/tokens?tx=YOUR_TX_HASH"
             }
         )
 
-    # Проверяем транзакцию через BaseScan
-    api_url = f"https://api.basescan.org/api?module=transaction&action=gettxreceiptstatus&txhash={tx}&apikey=YourApiKeyToken"
-    try:
-        check = requests.get(api_url, timeout=5)
-        result = check.json()
-        if result.get("status") != "1":
-            return JSONResponse(status_code=402, content={"error": "Transaction not found or failed"})
-    except:
-        pass  # если BaseScan не ответил — пропускаем проверку
-
-    # Отдаём данные
     response = requests.get(
         "https://api.dexscreener.com/latest/dex/search?q=base",
         headers={"User-Agent": "Mozilla/5.0"}
