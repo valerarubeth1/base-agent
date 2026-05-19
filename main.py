@@ -73,7 +73,9 @@ def make_402_response():
                 "scheme": "exact",
                 "network": "eip155:8453",
                 "amount": "1000",
-                "resource": RESOURCE_URL,
+                "resource": "https://base-agent-production.up.railway.app/tokens",
+                "description": "Top Base tokens by 24h volume",
+                "mimeType": "application/json",
                 "asset": USDC_ASSET,
                 "payTo": PAY_TO,
                 "maxTimeoutSeconds": 300,
@@ -97,10 +99,18 @@ def make_402_response():
                             "wallet": PAY_TO
                         }
                     }
+                },
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "agent": {"type": "string"},
+                        "count": {"type": "number"},
+                        "tokens": {"type": "array"},
+                        "wallet": {"type": "string"}
+                    }
                 }
             }
         }
-    }
     encoded = base64.b64encode(json.dumps(payment_envelope, separators=(',', ':')).encode()).decode()
     return Response(
         status_code=402,
