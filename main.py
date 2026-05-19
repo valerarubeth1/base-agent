@@ -10,15 +10,13 @@ app = FastAPI()
 PAY_TO = "0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a"
 USDC_ASSET = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 RESOURCE_URL = "https://base-agent-production.up.railway.app/tokens"
-FACILITATOR_URL = "https://api.cdp.coinbase.com/platform/v2/x402/facilitator"
+FACILITATOR_URL = "https://facilitator.xpay.sh"
 
 def settle_payment(payment_header: str) -> bool:
     try:
-        api_key = os.environ.get("CDP_API_KEY_NAME", "")
         res = requests.post(
             f"{FACILITATOR_URL}/settle",
             json={
-                "x402Version": 2,
                 "paymentPayload": payment_header,
                 "paymentRequirements": {
                     "scheme": "exact",
@@ -30,11 +28,8 @@ def settle_payment(payment_header: str) -> bool:
                     "extra": {"name": "USD Coin", "version": "2"}
                 }
             },
-            headers={
-                "X-API-Key": api_key,
-                "Content-Type": "application/json"
-            },
-            timeout=10
+            headers={"Content-Type": "application/json"},
+            timeout=15
         )
         print(f"Settle: {res.status_code} {res.text}")
         return res.status_code == 200
