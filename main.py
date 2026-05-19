@@ -124,21 +124,9 @@ def make_402_response():
 @app.middleware("http")
 async def x402_middleware(request: Request, call_next):
     if request.url.path == "/tokens":
-        # Логируем все заголовки чтобы найти правильное имя
-        print(f"Headers: {dict(request.headers)}")
-        
-        payment_header = (
-            request.headers.get("X-PAYMENT") or
-            request.headers.get("x-payment") or
-            request.headers.get("Payment") or
-            request.headers.get("payment") or
-            request.headers.get("Authorization") or
-            request.headers.get("X-402-Payment")
-        )
-        
+        payment_header = request.headers.get("payment-signature")
         if not payment_header:
             return make_402_response()
-        
         print(f"Payment received: {payment_header[:60]}...")
         response = await call_next(request)
         settle_payment(payment_header)
