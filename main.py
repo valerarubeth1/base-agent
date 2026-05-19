@@ -17,6 +17,7 @@ def settle_payment(payment_header: str) -> bool:
         res = requests.post(
             f"{FACILITATOR_URL}/settle",
             json={
+                "x402Version": 2,
                 "paymentPayload": payment_header,
                 "paymentRequirements": {
                     "scheme": "exact",
