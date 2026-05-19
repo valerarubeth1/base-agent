@@ -14,10 +14,13 @@ FACILITATOR_URL = "https://facilitator.xpay.sh"
 
 def settle_payment(payment_header: str) -> bool:
     try:
+        # Декодируем payload из base64
+        decoded = json.loads(base64.b64decode(payment_header).decode())
+        
         res = requests.post(
             f"{FACILITATOR_URL}/settle",
             json={
-                "paymentPayload": payment_header,
+                "paymentPayload": decoded,
                 "paymentRequirements": {
                     "scheme": "exact",
                     "network": "eip155:8453",
