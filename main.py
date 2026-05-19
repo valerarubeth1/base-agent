@@ -17,7 +17,7 @@ def settle_payment(payment_header: str) -> bool:
         res = requests.post(
             f"{FACILITATOR_URL}/settle",
             json={
-                "payment": payment_header,
+                "paymentPayload": payment_header,
                 "paymentRequirements": {
                     "scheme": "exact",
                     "network": "eip155:8453",
