@@ -68,14 +68,16 @@ def make_402_response():
     payment_envelope = {
         "x402Version": 2,
         "error": "Payment required",
+        "resource": {
+            "url": RESOURCE_URL,
+            "description": "Top Base tokens by 24h volume with liquidity > $5000",
+            "mimeType": "application/json"
+        },
         "accepts": [
             {
                 "scheme": "exact",
                 "network": "eip155:8453",
                 "amount": "1000",
-                "resource": RESOURCE_URL,
-                "description": "Top Base tokens by 24h volume",
-                "mimeType": "application/json",
                 "asset": USDC_ASSET,
                 "payTo": PAY_TO,
                 "maxTimeoutSeconds": 300,
@@ -85,13 +87,9 @@ def make_402_response():
         "extensions": {
             "bazaar": {
                 "info": {
-                    "name": "Base Token Parser",
-                    "description": "Top Base tokens by 24h volume with liquidity > $5000",
-                    "category": "data",
-                    "tags": ["base", "tokens", "defi"],
+                    "input": {"type": "http", "method": "GET", "queryParams": {}},
                     "output": {
-                        "description": "Top 10 Base tokens sorted by 24h volume",
-                        "contentType": "application/json",
+                        "type": "json",
                         "example": {
                             "agent": "Base Token Parser",
                             "count": 10,
