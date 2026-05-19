@@ -14,6 +14,7 @@ FACILITATOR_URL = "https://api.cdp.coinbase.com/platform/v2/x402/facilitator"
 
 def settle_payment(payment_header: str) -> bool:
     try:
+        api_key = os.environ.get("CDP_API_KEY_NAME", "")
         res = requests.post(
             f"{FACILITATOR_URL}/settle",
             json={
@@ -28,6 +29,10 @@ def settle_payment(payment_header: str) -> bool:
                     "maxTimeoutSeconds": 300,
                     "extra": {"name": "USD Coin", "version": "2"}
                 }
+            },
+            headers={
+                "X-API-Key": api_key,
+                "Content-Type": "application/json"
             },
             timeout=10
         )
