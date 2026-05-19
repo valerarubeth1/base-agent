@@ -73,7 +73,7 @@ def make_402_response():
                 "scheme": "exact",
                 "network": "eip155:8453",
                 "amount": "1000",
-                "resource": "https://base-agent-production.up.railway.app/tokens",
+                "resource": RESOURCE_URL,
                 "description": "Top Base tokens by 24h volume",
                 "mimeType": "application/json",
                 "asset": USDC_ASSET,
@@ -111,6 +111,7 @@ def make_402_response():
                 }
             }
         }
+    }
     encoded = base64.b64encode(json.dumps(payment_envelope, separators=(',', ':')).encode()).decode()
     return Response(
         status_code=402,
