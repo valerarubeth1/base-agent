@@ -10,7 +10,7 @@ app = FastAPI()
 PAY_TO = "0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a"
 USDC_ASSET = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 RESOURCE_URL = "https://base-agent-production.up.railway.app/tokens"
-FACILITATOR_URL = "https://x402.org/facilitator"
+FACILITATOR_URL = "https://api.cdp.coinbase.com/platform/v2/x402/facilitator"
 
 def settle_payment(payment_header: str) -> bool:
     try:
