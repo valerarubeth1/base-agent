@@ -12,32 +12,6 @@ USDC_ASSET = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 RESOURCE_URL = "https://base-agent-production.up.railway.app/tokens"
 FACILITATOR_URL = "https://x402.org/facilitator"
 
-def verify_payment(payment_header: str) -> bool:
-    try:
-        res = requests.post(
-            f"{FACILITATOR_URL}/verify",
-            json={
-                "payment": payment_header,
-                "paymentRequirements": {
-                    "scheme": "exact",
-                    "network": "eip155:8453",
-                    "amount": "1000",
-                    "asset": USDC_ASSET,
-                    "payTo": PAY_TO,
-                    "maxTimeoutSeconds": 300,
-                    "extra": {
-                        "name": "USD Coin",
-                        "version": "2"
-                    }
-                }
-            },
-            timeout=10
-        )
-        return res.status_code == 200 and res.json().get("isValid", False)
-    except Exception as e:
-        print(f"Ошибка верификации: {e}")
-        return False
-
 def settle_payment(payment_header: str) -> bool:
     try:
         res = requests.post(
@@ -51,22 +25,18 @@ def settle_payment(payment_header: str) -> bool:
                     "asset": USDC_ASSET,
                     "payTo": PAY_TO,
                     "maxTimeoutSeconds": 300,
-                    "extra": {
-                        "name": "USD Coin",
-                        "version": "2"
-                    }
+                    "extra": {"name": "USD Coin", "version": "2"}
                 }
             },
             timeout=10
         )
-        print(f"Settle response: {res.status_code} {res.text}")
+        print(f"Settle: {res.status_code} {res.text}")
         return res.status_code == 200
     except Exception as e:
-        print(f"Ошибка settle: {e}")
+        print(f"Settle error: {e}")
         return False
 
 def fetch_hot_tokens():
-    tokens_list = []
     try:
         response = requests.get('https://api.dexscreener.com/token-profiles/latest/v1', timeout=5)
         if response.status_code == 200:
@@ -77,123 +47,93 @@ def fetch_hot_tokens():
                 pairs_res = requests.get(f'https://api.dexscreener.com/latest/dex/tokens/{addrs_str}', timeout=5)
                 if pairs_res.status_code == 200:
                     pairs_data = pairs_res.json().get('pairs', [])
+                    tokens_list = []
                     for pair in pairs_data:
                         liquidity = pair.get('liquidity', {}).get('usd', 0)
                         if pair.get('chainId') == 'base' and liquidity >= 5000:
                             tokens_list.append({
-                                "address": pair.get('baseToken', {}).get('address', ''),
-                                "liquidity_usd": float(liquidity),
-                                "price_usd": pair.get('priceUsd', '0'),
                                 "symbol": pair.get('baseToken', {}).get('symbol', 'UNKNOWN'),
-                                "url": pair.get('url', ''),
-                                "volume_24h": float(pair.get('volume', {}).get('h24', 0))
+                                "address": pair.get('baseToken', {}).get('address', ''),
+                                "price_usd": pair.get('priceUsd', '0'),
+                                "volume_24h": float(pair.get('volume', {}).get('h24', 0)),
+                                "liquidity_usd": float(liquidity),
+                                "url": pair.get('url', '')
                             })
                     return sorted(tokens_list, key=lambda x: x['volume_24h'], reverse=True)[:10]
     except Exception as e:
-        print(f"Ошибка парсинга DexScreener: {e}")
+        print(f"DexScreener error: {e}")
+    return []
 
-    return [{
-        "address": "0x099880c1676FF3035Ab1E952E5E83b5A81eecB07",
-        "liquidity_usd": 77934.83,
-        "price_usd": "0.0000009813",
-        "symbol": "GNULL",
-        "url": "https://dexscreener.com/base/0x3676a19715f72f7a7730cc44b26fc515464642f8634dc7f9e6df2f3d7a2d7b79",
-        "volume_24h": 399443.06
-    }]
-
-@app.middleware("http")
-async def x402_payment_middleware(request: Request, call_next):
-    if request.url.path == "/tokens":
-        payment_header = request.headers.get("payment-signature")
-
-        if not payment_header:
-            default_tokens = fetch_hot_tokens()
-
-            payment_envelope = {
-                "x402Version": 2,
-                "error": "Payment required",
-                "resource": {
-                    "url": RESOURCE_URL,
-                    "description": "Returns top filtered tokens on Base with liquidity > $5000, sorted by 24h volume.",
-                    "mimeType": "application/json"
-                },
-                "accepts": [
-                    {
-                        "scheme": "exact",
-                        "network": "eip155:8453",
-                        "amount": "1000",
-                        "asset": USDC_ASSET,
-                        "payTo": PAY_TO,
-                        "maxTimeoutSeconds": 300,
-                        "extra": {
-                            "name": "USD Coin",
-                            "version": "2"
-                        },
-                        "eip712": {
-                            "domain": {
-                                "chainId": 8453,
-                                "name": "USD Coin",
-                                "verifyingContract": USDC_ASSET,
-                                "version": "2"
-                            }
-                        }
-                    }
-                ],
-                "extensions": {
-                    "bazaar": {
-                        "info": {
-                            "input": {"type": "http", "method": "GET", "queryParams": {}},
-                            "output": {
-                                "type": "json",
-                                "example": {
-                                    "agent": "Base Token Parser",
-                                    "count": 1,
-                                    "tokens": [],
-                                    "wallet": PAY_TO
-                                }
-                            }
-                        },
-                        "schema": {
-                            "type": "object",
-                            "properties": {
-                                "agent": {"type": "string"},
-                                "count": {"type": "number"},
-                                "tokens": {"type": "array"},
-                                "wallet": {"type": "string"}
-                            }
+def make_402_response():
+    payment_envelope = {
+        "x402Version": 2,
+        "error": "Payment required",
+        "accepts": [
+            {
+                "scheme": "exact",
+                "network": "eip155:8453",
+                "amount": "1000",
+                "resource": RESOURCE_URL,
+                "asset": USDC_ASSET,
+                "payTo": PAY_TO,
+                "maxTimeoutSeconds": 300,
+                "extra": {"name": "USD Coin", "version": "2"}
+            }
+        ],
+        "extensions": {
+            "bazaar": {
+                "info": {
+                    "name": "Base Token Parser",
+                    "description": "Top Base tokens by 24h volume with liquidity > $5000",
+                    "category": "data",
+                    "tags": ["base", "tokens", "defi"],
+                    "output": {
+                        "description": "Top 10 Base tokens sorted by 24h volume",
+                        "contentType": "application/json",
+                        "example": {
+                            "agent": "Base Token Parser",
+                            "count": 10,
+                            "tokens": [{"symbol": "TOKEN", "price_usd": "0.001", "volume_24h": 100000}],
+                            "wallet": PAY_TO
                         }
                     }
                 }
             }
+        }
+    }
+    encoded = base64.b64encode(json.dumps(payment_envelope, separators=(',', ':')).encode()).decode()
+    return Response(
+        status_code=402,
+        content=json.dumps({"error": "Payment Required"}),
+        media_type="application/json",
+        headers={
+            "PAYMENT-REQUIRED": encoded,
+            "Access-Control-Expose-Headers": "PAYMENT-REQUIRED"
+        }
+    )
 
-            json_str = json.dumps(payment_envelope, separators=(',', ':'))
-            encoded_payload = base64.b64encode(json_str.encode('utf-8')).decode('utf-8')
-
-            return Response(
-                status_code=402,
-                content="",
-                headers={
-                    "PAYMENT-REQUIRED": encoded_payload,
-                    "Access-Control-Expose-Headers": "PAYMENT-REQUIRED"
-                }
-            )
-
-        # Заголовок есть — пропускаем к обработчику
-        print(f"Payment received: {payment_header[:50]}...")
-
+@app.middleware("http")
+async def x402_middleware(request: Request, call_next):
+    if request.url.path == "/tokens":
+        payment_header = request.headers.get("X-PAYMENT")
+        if not payment_header:
+            return make_402_response()
+        print(f"Payment received: {payment_header[:60]}...")
+        response = await call_next(request)
+        settle_payment(payment_header)
+        return response
     return await call_next(request)
+
+@app.get("/")
+def home():
+    return {"agent": "Base Token Parser", "wallet": PAY_TO, "price": "0.001 USDC", "endpoint": "/tokens"}
 
 @app.get("/tokens")
 async def handler() -> dict[str, Any]:
-    hot_tokens = fetch_hot_tokens()
-    return {
-        "agent": "Base Token Parser",
-        "count": len(hot_tokens),
-        "tokens": hot_tokens,
-        "wallet": PAY_TO
-    }
+    tokens = fetch_hot_tokens()
+    return {"agent": "Base Token Parser", "count": len(tokens), "tokens": tokens, "wallet": PAY_TO}
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get("PORT", 4021))
+    port = int(os.environ.get("PORT", 8080))
     uvicorn.run(app, host="0.0.0.0", port=port)
