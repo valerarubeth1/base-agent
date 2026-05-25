@@ -13,7 +13,6 @@ import os
 app = FastAPI()
 
 PAY_TO = "0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a"
-RESOURCE_URL = "https://base-agent-production.up.railway.app/tokens"
 FACILITATOR_URL = "https://facilitator.xpay.sh"
 
 server = x402ResourceServer(HTTPFacilitatorClient(FacilitatorConfig(url=FACILITATOR_URL)))
@@ -27,7 +26,6 @@ routes = {
                 price="$0.001",
                 network="eip155:8453",
                 pay_to=PAY_TO,
-                resource_url=RESOURCE_URL,
             )
         ],
         mime_type="application/json",
