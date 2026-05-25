@@ -1,43 +1,58 @@
 from typing import Any
-from fastapi import FastAPI, Response, Request
+from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
+from x402.http.middleware.fastapi import PaymentMiddlewareASGI
+from x402.http import HTTPFacilitatorClient, FacilitatorConfig, PaymentOption
+from x402.http.types import RouteConfig
+from x402.server import x402ResourceServer
+from x402.mechanisms.evm.exact import ExactEvmServerScheme
+from x402.extensions.bazaar import declare_discovery_extension, OutputConfig
 import requests
-import json
-import base64
 import os
 
 app = FastAPI()
 
 PAY_TO = "0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a"
-USDC_ASSET = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
-RESOURCE_URL = "https://base-agent-production.up.railway.app/tokens"
-FACILITATOR_URL = "https://facilitator.xpay.sh"
+FACILITATOR_URL = "https://x402.org/facilitator"
 
-def settle_payment(payment_header: str) -> bool:
-    try:
-        decoded = json.loads(base64.b64decode(payment_header).decode())
-        res = requests.post(
-            f"{FACILITATOR_URL}/settle",
-            json={
-                "paymentPayload": decoded,
-                "paymentRequirements": {
-                    "scheme": "exact",
-                    "network": "eip155:8453",
-                    "amount": "1000",
-                    "asset": USDC_ASSET,
-                    "payTo": PAY_TO,
-                    "maxTimeoutSeconds": 300,
-                    "extra": {"name": "USD Coin", "version": "2"}
+server = x402ResourceServer(HTTPFacilitatorClient(FacilitatorConfig(url=FACILITATOR_URL)))
+server.register("eip155:8453", ExactEvmServerScheme())
+
+routes = {
+    "GET /tokens": RouteConfig(
+        accepts=[
+            PaymentOption(
+                scheme="exact",
+                price="$0.001",
+                network="eip155:8453",
+                pay_to=PAY_TO,
+            )
+        ],
+        mime_type="application/json",
+        description="Top Base tokens by 24h volume with liquidity > $5000",
+        extensions=declare_discovery_extension(
+            output=OutputConfig(
+                example={
+                    "agent": "Base Token Parser",
+                    "count": 10,
+                    "tokens": [{"symbol": "TOKEN", "price_usd": "0.001", "volume_24h": 100000}],
+                    "wallet": PAY_TO
+                },
+                schema={
+                    "type": "object",
+                    "properties": {
+                        "agent": {"type": "string"},
+                        "count": {"type": "number"},
+                        "tokens": {"type": "array"},
+                        "wallet": {"type": "string"}
+                    }
                 }
-            },
-            headers={"Content-Type": "application/json"},
-            timeout=15
+            )
         )
-        print(f"Settle: {res.status_code} {res.text}")
-        return res.status_code == 200
-    except Exception as e:
-        print(f"Settle error: {e}")
-        return False
+    )
+}
+
+app.add_middleware(PaymentMiddlewareASGI, routes=routes, server=server)
 
 def fetch_hot_tokens():
     try:
@@ -67,86 +82,12 @@ def fetch_hot_tokens():
         print(f"DexScreener error: {e}")
     return []
 
-def make_402_response():
-    payment_envelope = {
-        "x402Version": 2,
-        "error": "Payment required",
-        "resource": {
-            "url": RESOURCE_URL,
-            "description": "Top Base tokens by 24h volume with liquidity > $5000",
-            "mimeType": "application/json"
-        },
-        "accepts": [
-            {
-                "scheme": "exact",
-                "network": "eip155:8453",
-                "amount": "1000",
-                "asset": USDC_ASSET,
-                "payTo": PAY_TO,
-                "maxTimeoutSeconds": 300,
-                "extra": {"name": "USD Coin", "version": "2"}
-            }
-        ],
-        "extensions": {
-            "bazaar": {
-                "info": {
-                    "input": {"type": "http", "method": "GET", "queryParams": {}},
-                    "output": {
-                        "type": "json",
-                        "example": {
-                            "agent": "Base Token Parser",
-                            "count": 10,
-                            "tokens": [{"symbol": "TOKEN", "price_usd": "0.001", "volume_24h": 100000}],
-                            "wallet": PAY_TO
-                        }
-                    }
-                },
-                "schema": {
-                    "type": "object",
-                    "properties": {
-                        "agent": {"type": "string"},
-                        "count": {"type": "number"},
-                        "tokens": {"type": "array"},
-                        "wallet": {"type": "string"}
-                    }
-                }
-            }
-        }
-    }
-    encoded = base64.b64encode(json.dumps(payment_envelope, separators=(',', ':')).encode()).decode()
-    return Response(
-        status_code=402,
-        content=json.dumps({"error": "Payment Required"}),
-        media_type="application/json",
-        headers={
-            "PAYMENT-REQUIRED": encoded,
-            "Access-Control-Expose-Headers": "PAYMENT-REQUIRED"
-        }
-    )
-
-@app.middleware("http")
-async def x402_middleware(request: Request, call_next):
-    if request.url.path == "/tokens":
-        payment_header = request.headers.get("payment-signature")
-        if not payment_header:
-            return make_402_response()
-        print(f"Payment received: {payment_header[:60]}...")
-        response = await call_next(request)
-        settle_payment(payment_header)
-        return response
-    return await call_next(request)
-
 @app.get("/", response_class=HTMLResponse)
 def home():
     return """<!DOCTYPE html>
-<html>
-<head>
+<html><head>
 <meta name="base:app_id" content="6a0c3af81c1db8c69c491b11" />
-</head>
-<body>
-<pre>{"agent": "Base Token Parser", "wallet": "0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a", "price": "0.001 USDC", "endpoint": "/tokens"}</pre>
-</body>
-</html>"""
+</head><body>Base Token Parser — x402 agent on Base</body></html>"""
 
 @app.get("/tokens")
 async def handler() -> dict[str, Any]:
