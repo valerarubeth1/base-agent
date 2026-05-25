@@ -13,7 +13,7 @@ import os
 app = FastAPI()
 
 PAY_TO = "0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a"
-FACILITATOR_URL = "https://x402.org/facilitator"
+FACILITATOR_URL = "https://facilitator.xpay.sh"
 
 server = x402ResourceServer(HTTPFacilitatorClient(FacilitatorConfig(url=FACILITATOR_URL)))
 server.register("eip155:8453", ExactEvmServerScheme())
