@@ -1,5 +1,6 @@
 from typing import Any
-from fastapi.responses import Response, HTMLResponse
+from fastapi import FastAPI, Response, Request
+from fastapi.responses import HTMLResponse
 import requests
 import json
 import base64
@@ -14,9 +15,7 @@ FACILITATOR_URL = "https://facilitator.xpay.sh"
 
 def settle_payment(payment_header: str) -> bool:
     try:
-        # Декодируем payload из base64
         decoded = json.loads(base64.b64decode(payment_header).decode())
-        
         res = requests.post(
             f"{FACILITATOR_URL}/settle",
             json={
@@ -137,8 +136,6 @@ async def x402_middleware(request: Request, call_next):
         return response
     return await call_next(request)
 
-from fastapi.responses import HTMLResponse
-
 @app.get("/", response_class=HTMLResponse)
 def home():
     return """<!DOCTYPE html>
@@ -147,7 +144,7 @@ def home():
 <meta name="base:app_id" content="6a0c3af81c1db8c69c491b11" />
 </head>
 <body>
-{"agent": "Base Token Parser", "wallet": "0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a", "price": "0.001 USDC", "endpoint": "/tokens"}
+<pre>{"agent": "Base Token Parser", "wallet": "0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a", "price": "0.001 USDC", "endpoint": "/tokens"}</pre>
 </body>
 </html>"""
 
