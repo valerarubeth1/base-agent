@@ -137,9 +137,19 @@ async def x402_middleware(request: Request, call_next):
         return response
     return await call_next(request)
 
-@app.get("/")
+from fastapi.responses import HTMLResponse
+
+@app.get("/", response_class=HTMLResponse)
 def home():
-    return {"agent": "Base Token Parser", "wallet": PAY_TO, "price": "0.001 USDC", "endpoint": "/tokens"}
+    return """<!DOCTYPE html>
+<html>
+<head>
+<meta name="base:app_id" content="6a0c3af81c1db8c69c491b11" />
+</head>
+<body>
+{"agent": "Base Token Parser", "wallet": "0x801108CA1B7Caf261D2e4a11E7701aF7cD377e8a", "price": "0.001 USDC", "endpoint": "/tokens"}
+</body>
+</html>"""
 
 @app.get("/tokens")
 async def handler() -> dict[str, Any]:
